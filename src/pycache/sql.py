@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
 import string
+
 _formatter = string.Formatter()
+
 
 class Composable(ABC):
     def __init__(self, fragment):
         self._fragments = fragment
-    
+
     @abstractmethod
     def to_string(self):
         pass
@@ -41,15 +43,15 @@ class Composed(Composable):
 
 
 class SQL(Composable):
-    def __init__(self,statement):
-        if not isinstance(statement,str):
+    def __init__(self, statement):
+        if not isinstance(statement, str):
             raise TypeError("SQL statement must be a string")
         super().__init__(statement)
 
     def to_string(self):
         return self._fragments
 
-    def format(self,*args,**kwargs):
+    def format(self, *args, **kwargs):
         compose_list = []
         for pre, name, spec, conv in _formatter.parse(self._fragments):
             if spec or conv:
@@ -57,23 +59,23 @@ class SQL(Composable):
 
             if pre:
                 compose_list.append(SQL(pre))
-            
+
             if not name:
                 continue
-            
+
             if name.isdigit():
                 raise TypeError("Format placeholder can't be string")
-        
+
             compose_list.append(kwargs[name])
-        
+
         return Composed(compose_list)
 
-        
+
 # SQL specific values. ex-> table name, column name
 # TODO: can be made more specific by having dot between table name and column name. Ex -> table.coumn
 class Identifier(Composable):
-    def __init__(self,value):
-        if not isinstance(value,str):
+    def __init__(self, value):
+        if not isinstance(value, str):
             raise TypeError("Identifer must be a string")
         super().__init__(value)
 
@@ -81,11 +83,12 @@ class Identifier(Composable):
         # backtick for the identifier
         return f"`{self._fragments.replace('`', '``')}`"
 
+
 # User provided values
 class Literal(Composable):
     def __init__(self, value):
         super().__init__(value)
-    
+
     def to_string(self):
         if self._fragments is None:
             return "NULL"
@@ -94,6 +97,7 @@ class Literal(Composable):
         elif isinstance(self._fragments, str):
             return f"'{self._fragments.replace("'","''")}'"
         return str(self._fragments)
+
 
 class Placeholder(Composable):
     def __init__(self, format="%s"):

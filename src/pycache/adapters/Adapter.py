@@ -1,9 +1,20 @@
 from abc import ABC, abstractmethod
+import pickle
 
 
 class Adapter(ABC):
-    def __init__(self):
-        self._tablename = "kv-store"
+    def __init__(self, connection_uri, tablename="kv-store"):
+        self._tablename = tablename
+        self._connection_uri = connection_uri
+        self._db = None
+
+    @abstractmethod
+    def connect(self):
+        pass
+
+    @abstractmethod
+    def close(self):
+        pass
 
     @abstractmethod
     def create(self):
@@ -18,7 +29,7 @@ class Adapter(ABC):
         pass
 
     @abstractmethod
-    def set(self, key: str, value: bytes) -> None:
+    def set(self, key: str, value) -> None:
         pass
 
     @abstractmethod
@@ -44,3 +55,9 @@ class Adapter(ABC):
     @abstractmethod
     def set_expire(self):
         pass
+
+    def to_bytes(self, data):
+        return pickle.dumps(data)
+
+    def to_value(self, data):
+        return pickle.loads(data)
