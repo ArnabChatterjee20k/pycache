@@ -1,3 +1,4 @@
+from ..datatypes.Datatype import Datatype
 from abc import ABC, abstractmethod
 import pickle
 
@@ -33,11 +34,11 @@ class Adapter(ABC):
         pass
 
     @abstractmethod
-    def batch_get(self, key: str) -> bytes:
+    def batch_get(self, keys: list[str]) -> bytes:
         pass
 
     @abstractmethod
-    def batch_set(self, key: str, value: bytes) -> None:
+    def batch_set(self, key_values: dict[str, Datatype]) -> None:
         pass
 
     @abstractmethod

@@ -14,10 +14,26 @@ class PyCache:
     def __exit__(self):
         self.adapter.close()
 
-    def set(self, key, value: Datatype):
-        if not isinstance(value, Datatype):
-            return TypeError("Value is not an instance of Datatype")
-        return self.adapter.set(key, value.value)
+    def set(self, key, value: Datatype | dict[str, Datatype]):
+        if isinstance(value, Datatype):
+            return self.adapter.set(key, value.value)
+
+        if isinstance(value, dict):
+            return self.adapter.batch_set(key, value)
+
+        raise TypeError("Value is not an instance of dictionary of string and Datatype")
+
+    def batch_set(self, value: dict[str, Datatype]):
+        if isinstance(value, dict):
+            return self.adapter.batch_set(value)
+
+        raise TypeError("Value is not an instance of dictionary of string and Datatype")
+
+    def batch_get(self, keys: list[str]):
+        if isinstance(keys, list):
+            return self.adapter.batch_get(keys)
+
+        raise TypeError("keys must be a list of string")
 
     def get(self, key):
         value = self.adapter.get(key)

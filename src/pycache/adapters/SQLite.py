@@ -1,5 +1,6 @@
 import sqlite3 as sqlite
 from .Adapter import Adapter
+from ..datatypes.Datatype import Datatype
 from ..sql import SQL, Composed, Identifier, Literal, Placeholder
 
 
@@ -42,7 +43,7 @@ class SQLite(Adapter):
     def create_index(self):
         pass
 
-    def get(self, key: str) -> bytes:
+    def get(self, key: str):
         stmt = Composed(
             [
                 SQL("SELECT {value} FROM {table} WHERE {key} = ").format(
@@ -79,11 +80,43 @@ class SQLite(Adapter):
         cursor.execute(stmt, (key, self.to_bytes(value)))
         self._db.commit()
 
-    def batch_get(self, key: str) -> bytes:
-        pass
+    def batch_get(self, keys: list[str]):
+        stmt = Composed(
+            [
+                SQL("SELECT {value} FROM {table}").format(
+                    table=Identifier(self._tablename), value=Identifier("value")
+                ),
+                SQL("WHERE {key} in ({keys})").format(
+                    key=Identifier("key"), keys=Placeholder("?", len(keys))
+                ),
+            ]
+        ).to_string()
+        cursor = self._db.cursor()
+        rows = cursor.execute(stmt, keys).fetchall()
+        return [self.to_value(row[0]) for row in rows]
 
-    def batch_set(self, key: str, value: bytes) -> None:
-        pass
+    def batch_set(self, key_values: dict[str, Datatype]) -> None:
+        stmt = (
+            SQL(
+                """
+            INSERT INTO {table} ({key}, {value}) 
+            VALUES (?, ?)
+            ON CONFLICT({key}) DO UPDATE SET {value} = excluded.{value}
+        """
+            )
+            .format(
+                table=Identifier(self._tablename),
+                key=Identifier("key"),
+                value=Identifier("value"),
+            )
+            .to_string()
+        )
+
+        data = [(k, self.to_bytes(v.value)) for k, v in key_values.items()]
+
+        cursor = self._db.cursor()
+        cursor.executemany(stmt, data)
+        self._db.commit()
 
     def delete(self, key: str) -> None:
         pass
