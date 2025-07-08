@@ -6,12 +6,4 @@ from .Queue import Queue
 from .Set import Set
 from .String import String
 
-__all__ = [
-    'Datatype',
-    'List',
-    'Map', 
-    'Numeric',
-    'Queue',
-    'Set',
-    'String'
-] 
+__all__ = ["Datatype", "List", "Map", "Numeric", "Queue", "Set", "String"]

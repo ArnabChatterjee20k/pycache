@@ -171,3 +171,7 @@ cython_debug/
 Thumbs.db
 ehthumbs.db
 Desktop.ini 
+*.sqlite3
+*.sqlite
+*.db
+test.py

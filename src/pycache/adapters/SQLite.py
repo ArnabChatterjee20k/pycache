@@ -20,7 +20,7 @@ class SQLite(Adapter):
                     """
                         (
                             {id} INTEGER PRIMARY KEY AUTOINCREMENT,
-                            {key} TEXT NOT NULL,
+                            {key} TEXT NOT NULL UNIQUE,
                             {value} BLOB NOT NULL,
                             {created_at} DATETIME DEFAULT CURRENT_TIMESTAMP,
                             {expires_at} DATETIME NULL
@@ -59,20 +59,22 @@ class SQLite(Adapter):
         return self.to_value(row[0]) if row else None
 
     def set(self, key: str, value: bytes) -> None:
-        stmt = (
-            SQL(
-                "INSERT INTO {table} ({key}, {value}) VALUES ({user_key}, {user_value})"
-            )
-            .format(
-                table=Identifier(self._tablename),
-                key=Identifier("key"),
-                value=Identifier("value"),
-                user_key=Placeholder("?"),
-                user_value=Placeholder("?"),
-            )
-            .to_string()
-        )
-
+        stmt = Composed(
+            [
+                SQL("INSERT INTO {table} ({key}, {value})").format(
+                    table=Identifier(self._tablename),
+                    key=Identifier("key"),
+                    value=Identifier("value"),
+                ),
+                SQL("VALUES ({user_key}, {user_value})").format(
+                    user_key=Placeholder("?"),
+                    user_value=Placeholder("?"),
+                ),
+                SQL("ON CONFLICT({key}) DO UPDATE SET {key} = excluded.{key}").format(
+                    key=Identifier("key")
+                ),
+            ]
+        ).to_string()
         cursor = self._db.cursor()
         cursor.execute(stmt, (key, self.to_bytes(value)))
         self._db.commit()

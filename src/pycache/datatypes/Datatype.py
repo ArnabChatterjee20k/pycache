@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 
+
 class Datatype(ABC):
-    def __init__(self,value):
+    def __init__(self, value):
         Datatype.validate(value)
         self._value = value
 
-    
     @property
     @abstractmethod
     def value(self):

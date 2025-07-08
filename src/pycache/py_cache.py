@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from .adapters.Adapter import Adapter
 from .datatypes.Datatype import Datatype
 
+
 class PyCache:
     def __init__(self, adapter: Adapter):
         self.adapter = adapter
@@ -13,8 +14,8 @@ class PyCache:
     def __exit__(self):
         self.adapter.close()
 
-    def set(self, key, value:Datatype):
-        if not isinstance(value,Datatype):
+    def set(self, key, value: Datatype):
+        if not isinstance(value, Datatype):
             return TypeError("Value is not an instance of Datatype")
         return self.adapter.set(key, value.value)
 

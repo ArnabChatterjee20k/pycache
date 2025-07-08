@@ -33,7 +33,7 @@ class Composed(Composable):
     def to_string(self):
         composables = []
         for fragement in self._fragments:
-            if isinstance(fragement,SQL):
+            if isinstance(fragement, SQL):
                 composables.append(fragement.to_string())
                 composables.append(" ")
             else:
