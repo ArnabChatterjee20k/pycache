@@ -56,7 +56,7 @@ class SQLite(Adapter):
 
         cursor = self._db.cursor()
         row = cursor.execute(stmt, (key,)).fetchone()
-        return row[0] if row else None
+        return self.to_value(row[0]) if row else None
 
     def set(self, key: str, value: bytes) -> None:
         stmt = (
@@ -74,7 +74,7 @@ class SQLite(Adapter):
         )
 
         cursor = self._db.cursor()
-        cursor.execute(stmt, (key, value))
+        cursor.execute(stmt, (key, self.to_bytes(value)))
         self._db.commit()
 
     def batch_get(self, key: str) -> bytes:

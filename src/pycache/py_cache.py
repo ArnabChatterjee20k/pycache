@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from .adapters.Adapter import Adapter
-
+from .datatypes.Datatype import Datatype
 
 class PyCache:
     def __init__(self, adapter: Adapter):
@@ -13,12 +13,14 @@ class PyCache:
     def __exit__(self):
         self.adapter.close()
 
-    def set(self, key, value):
-        return self.adapter.set(key, self.adapter.to_bytes(value))
+    def set(self, key, value:Datatype):
+        if not isinstance(value,Datatype):
+            return TypeError("Value is not an instance of Datatype")
+        return self.adapter.set(key, value.value)
 
     def get(self, key):
         value = self.adapter.get(key)
-        return self.adapter.to_value(value) if value else value
+        return value if value else value
 
     @contextmanager
     def session(self):
