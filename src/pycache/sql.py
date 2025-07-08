@@ -107,10 +107,14 @@ class Literal(Composable):
 
 
 class Placeholder(Composable):
-    def __init__(self, format="%s"):
+    def __init__(self, format="%s", multiplier=1):
         if not isinstance(format, str):
             raise TypeError("Placeholder format must be a string")
-        super().__init__(format)
+        if not isinstance(multiplier, int):
+            raise TypeError("Multiplier must be an int")
+        if multiplier < 0:
+            raise ValueError("Multiplier must be atleast 1")
+        super().__init__(", ".join([format] * multiplier))
 
     def to_string(self):
         return self._fragments
