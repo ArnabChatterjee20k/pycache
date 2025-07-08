@@ -39,6 +39,18 @@ class PyCache:
         value = self.adapter.get(key)
         return value if value else value
 
+    def delete(self, key):
+        return self.adapter.delete(key)
+
+    def exists(self, key):
+        return self.adapter.exists(key)
+
+    def keys(self):
+        return self.adapter.keys()
+
+    def set_expire(self, key, expires_at):
+        return self.adapter.set_expire(key, expires_at)
+
     @contextmanager
     def session(self):
         try:

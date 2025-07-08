@@ -119,13 +119,53 @@ class SQLite(Adapter):
         self._db.commit()
 
     def delete(self, key: str) -> None:
-        pass
+        stmt = Composed(
+            [
+                SQL("DELETE FROM {table} WHERE {key} = ").format(
+                    table=Identifier(self._tablename), key=Identifier("key")
+                ),
+                Placeholder("?"),
+            ]
+        ).to_string()
+        cursor = self._db.cursor()
+        cursor.execute(stmt, (key,))
+        self._db.commit()
 
     def exists(self, key: str) -> bool:
-        pass
+        stmt = Composed(
+            [
+                SQL("SELECT 1 FROM {table} WHERE {key} = ").format(
+                    table=Identifier(self._tablename), key=Identifier("key")
+                ),
+                Placeholder("?"),
+            ]
+        ).to_string()
+        cursor = self._db.cursor()
+        row = cursor.execute(stmt, (key,)).fetchone()
+        return row is not None
 
     def keys(self) -> list:
-        pass
+        stmt = (
+            SQL("SELECT {key} FROM {table}")
+            .format(key=Identifier("key"), table=Identifier(self._tablename))
+            .to_string()
+        )
+        cursor = self._db.cursor()
+        rows = cursor.execute(stmt).fetchall()
+        return [row[0] for row in rows]
 
-    def set_expire(self):
-        pass
+    def set_expire(self, key: str, expires_at) -> None:
+        stmt = Composed(
+            [
+                SQL("UPDATE {table} SET {expires_at} = ").format(
+                    table=Identifier(self._tablename),
+                    expires_at=Identifier("expires_at"),
+                ),
+                Placeholder("?"),
+                SQL(" WHERE {key} = ").format(key=Identifier("key")),
+                Placeholder("?"),
+            ]
+        ).to_string()
+        cursor = self._db.cursor()
+        cursor.execute(stmt, (expires_at, key))
+        self._db.commit()
