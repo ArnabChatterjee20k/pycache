@@ -6,7 +6,8 @@ from ..sql import SQL, Composed, Identifier, Literal, Placeholder
 
 class SQLite(Adapter):
     def connect(self):
-        self._db = sqlite.connect(self._connection_uri)
+        # HACK: sqlite assumes you are opening a connection, executing all operations and closing them in the same thread
+        self._db = sqlite.connect(self._connection_uri, check_same_thread=False)
 
     def close(self):
         self._db.close()
