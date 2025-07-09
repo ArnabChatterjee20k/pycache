@@ -71,9 +71,9 @@ class SQLite(Adapter):
                     user_key=Placeholder("?"),
                     user_value=Placeholder("?"),
                 ),
-                SQL("ON CONFLICT({key}) DO UPDATE SET {key} = excluded.{key}").format(
-                    key=Identifier("key")
-                ),
+                SQL(
+                    "ON CONFLICT({key}) DO UPDATE SET {value} = excluded.{value}"
+                ).format(key=Identifier("key"), value=Identifier("value")),
             ]
         ).to_string()
         cursor = self._db.cursor()
@@ -83,8 +83,10 @@ class SQLite(Adapter):
     def batch_get(self, keys: list[str]):
         stmt = Composed(
             [
-                SQL("SELECT {value} FROM {table}").format(
-                    table=Identifier(self._tablename), value=Identifier("value")
+                SQL("SELECT {key}, {value} FROM {table}").format(
+                    key=Identifier("key"),
+                    table=Identifier(self._tablename),
+                    value=Identifier("value"),
                 ),
                 SQL("WHERE {key} in ({keys})").format(
                     key=Identifier("key"), keys=Placeholder("?", len(keys))
@@ -93,7 +95,7 @@ class SQLite(Adapter):
         ).to_string()
         cursor = self._db.cursor()
         rows = cursor.execute(stmt, keys).fetchall()
-        return [self.to_value(row[0]) for row in rows]
+        return {row[0]: self.to_value(row[1]) for row in rows}
 
     def batch_set(self, key_values: dict[str, Datatype]) -> None:
         stmt = (
