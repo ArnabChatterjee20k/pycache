@@ -31,14 +31,7 @@ class Composed(Composable):
         super().__init__(seq)
 
     def to_string(self):
-        composables = []
-        for fragement in self._fragments:
-            if isinstance(fragement, SQL):
-                composables.append(fragement.to_string())
-                composables.append(" ")
-            else:
-                composables.append(fragement.to_string())
-        return "".join(composables)
+        return "".join(list(map(lambda e: e.to_string(), self._fragments)))
 
     def __add__(self, other):
         if isinstance(other, Composable):
