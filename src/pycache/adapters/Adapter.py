@@ -1,5 +1,6 @@
 from ..datatypes.Datatype import Datatype
 from abc import ABC, abstractmethod
+from datetime import datetime, timedelta, timezone
 import pickle
 
 
@@ -10,7 +11,7 @@ class Adapter(ABC):
         self._db = None
 
     @abstractmethod
-    def connect(self):
+    def connect(self) -> "Adapter":
         pass
 
     @abstractmethod
@@ -18,31 +19,31 @@ class Adapter(ABC):
         pass
 
     @abstractmethod
-    def create(self):
+    def create(self) -> None:
         pass
 
     @abstractmethod
-    def create_index(self):
+    def create_index(self) -> None:
         pass
 
     @abstractmethod
-    def get(self, key: str) -> bytes:
+    def get(self, key: str) -> any:
         pass
 
     @abstractmethod
-    def set(self, key: str, value) -> None:
+    def set(self, key: str, value) -> int:
         pass
 
     @abstractmethod
-    def batch_get(self, keys: list[str]) -> bytes:
+    def batch_get(self, keys: list[str]) -> list:
         pass
 
     @abstractmethod
-    def batch_set(self, key_values: dict[str, Datatype]) -> None:
+    def batch_set(self, key_values: dict[str, Datatype]) -> int:
         pass
 
     @abstractmethod
-    def delete(self, key: str) -> None:
+    def delete(self, key: str) -> int:
         pass
 
     @abstractmethod
@@ -54,7 +55,11 @@ class Adapter(ABC):
         pass
 
     @abstractmethod
-    def set_expire(self):
+    def set_expire(self, ttl) -> int:
+        pass
+
+    @abstractmethod
+    def get_expire(self, key) -> int | None:
         pass
 
     @abstractmethod
@@ -62,7 +67,7 @@ class Adapter(ABC):
         pass
 
     @abstractmethod
-    def get_datetime_format(self):
+    def get_datetime_format(self) -> str:
         pass
 
     def to_bytes(self, data):
@@ -70,3 +75,8 @@ class Adapter(ABC):
 
     def to_value(self, data):
         return pickle.loads(data)
+
+    def get_expires_at(self, ttl):
+        return (datetime.now(timezone.utc) + timedelta(seconds=ttl)).strftime(
+            self.get_datetime_format()
+        )

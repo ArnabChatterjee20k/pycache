@@ -476,7 +476,8 @@ class BaseCacheTests(ABC):
         """Test setting expiration before setting a value."""
         async with self.cache.session() as cache:
             # Set expiration before setting value
-            await cache.set_expire("key", 1)
+            key = await cache.set_expire("key", 1)
+            assert key == 0
 
             # Key should not exist
             assert not await cache.exists("key")
@@ -488,6 +489,8 @@ class BaseCacheTests(ABC):
             assert await cache.exists("key")
             assert await cache.get("key") == "value"
 
+            key = await cache.set_expire("key", 1)
+            assert key == 1
             # Wait for expiration
             await asyncio.sleep(1.5)
 

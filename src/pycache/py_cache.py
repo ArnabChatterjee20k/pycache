@@ -26,7 +26,7 @@ class PyCache:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.adapter.close()
 
-    async def set(self, key, value: Datatype | dict[str, Datatype]):
+    async def set(self, key, value: Datatype | dict[str, Datatype]) -> int:
         if isinstance(value, Datatype):
             return await self.adapter.set(key, value.value)
 
@@ -35,13 +35,13 @@ class PyCache:
 
         raise TypeError("Value must be a Datatype or a dictionary of string → Datatype")
 
-    async def batch_set(self, value: dict[str, Datatype]):
+    async def batch_set(self, value: dict[str, Datatype]) -> int:
         if isinstance(value, dict):
             return await self.adapter.batch_set(value)
 
         raise TypeError("Value must be a dictionary of string → Datatype")
 
-    async def batch_get(self, keys: list[str]):
+    async def batch_get(self, keys: list[str]) -> dict:
         if not isinstance(keys, list):
             raise TypeError("keys must be a list of strings")
 
@@ -50,26 +50,26 @@ class PyCache:
     async def get(self, key):
         return await self.adapter.get(key)
 
-    async def delete(self, key):
+    async def delete(self, key) -> int:
         return await self.adapter.delete(key)
 
-    async def exists(self, key):
+    async def exists(self, key) -> bool:
         return await self.adapter.exists(key)
 
-    async def keys(self):
+    async def keys(self) -> list:
         return await self.adapter.keys()
 
-    async def set_expire(self, key, ttl):
+    async def set_expire(self, key, ttl) -> int:
         if not isinstance(ttl, (float, int)):
             raise TypeError("ttl must be numeric")
 
         if ttl < 1:
             raise ValueError("ttl must be atleast 1second")
 
-        expires_at = (datetime.now(timezone.utc) + timedelta(seconds=ttl)).strftime(
-            self.adapter.get_datetime_format()
-        )
-        return await self.adapter.set_expire(key, expires_at)
+        return await self.adapter.set_expire(key, ttl)
+
+    async def get_expire(self, key) -> int:
+        return await self.adapter.get_expire(key)
 
     async def stop_ttl(self):
         if self._ttl_worker:

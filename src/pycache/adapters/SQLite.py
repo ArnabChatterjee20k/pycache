@@ -94,7 +94,7 @@ class SQLite(Adapter):
                     set_future_exception, payload.future, e
                 )
 
-    async def connect(self):
+    async def connect(self) -> "SQLite":
         self._running = True
         self._executor.start()
 
@@ -114,7 +114,7 @@ class SQLite(Adapter):
             self._executor.join()
 
     @_async_op
-    def create(self):
+    def create(self) -> None:
         stmt = Composed(
             [
                 SQL("CREATE TABLE IF NOT EXISTS {table}").format(
@@ -128,6 +128,7 @@ class SQLite(Adapter):
                             {value} BLOB NOT NULL,
                             {created_at} DATETIME DEFAULT CURRENT_TIMESTAMP,
                             {expires_at} DATETIME NULL,
+                            {ttl} INTEGER NULL
                             CHECK ({expires_at} IS NULL OR {expires_at} > {created_at})
                         )
                     """
@@ -137,6 +138,7 @@ class SQLite(Adapter):
                     value=Identifier("value"),
                     created_at=Identifier("created_at"),
                     expires_at=Identifier("expires_at"),
+                    ttl=Identifier("ttl"),
                 ),
             ]
         ).to_string()
@@ -145,7 +147,7 @@ class SQLite(Adapter):
         db.commit()
 
     @_async_op
-    def create_index(self):
+    def create_index(self) -> None:
         index_name = f"{self._tablename}_expires_at_index"
         # index automatically created on the key as it is unique
         stmt = (
@@ -186,7 +188,7 @@ class SQLite(Adapter):
         #     print(row)
 
     @_async_op
-    def get(self, key: str):
+    def get(self, key: str) -> any:
         # SQLite doesn't provide select for update to lock table, we need to lock the entire database
         # TODO: need to use distributed locks may be with a separate locks table
         stmt = Composed(
@@ -208,7 +210,11 @@ class SQLite(Adapter):
         return self.to_value(row[0]) if row else None
 
     @_async_op
-    def set(self, key: str, value: bytes) -> None:
+    def set(self, key: str, value: bytes) -> int:
+        # || is the concatenation operation
+        # SELECT DATETIME(CURRENT_TIMESTAMP, '+' || 30 || ' seconds') -> current time + 30 seconds
+        # SELECT DATETIME(CURRENT_TIMESTAMP, '+' || NULL || ' seconds') -> NULL
+        # here 30 , NULL are the ttl column which will be reference internally
         stmt = Composed(
             [
                 SQL("INSERT INTO {table} ({key}, {value})").format(
@@ -221,8 +227,13 @@ class SQLite(Adapter):
                     user_value=Placeholder("?"),
                 ),
                 SQL(
-                    "ON CONFLICT({key}) DO UPDATE SET {value} = excluded.{value}, {created_at} = CURRENT_TIMESTAMP, {expires_at} = NULL"
+                    """ON CONFLICT({key}) DO UPDATE SET 
+                        {value} = excluded.{value}, 
+                        {created_at} = CURRENT_TIMESTAMP, 
+                        {expires_at} = DATETIME(CURRENT_TIMESTAMP,'+' || {ttl} || ' seconds')
+                        """
                 ).format(
+                    ttl=Identifier("ttl"),
                     key=Identifier("key"),
                     value=Identifier("value"),
                     created_at=Identifier("created_at"),
@@ -241,7 +252,7 @@ class SQLite(Adapter):
         return row[0] if row else None
 
     @_async_op
-    def batch_get(self, keys: list[str]):
+    def batch_get(self, keys: list[str]) -> list:
         stmt = Composed(
             [
                 SQL("SELECT {key}, {value} FROM {table}").format(
@@ -263,7 +274,7 @@ class SQLite(Adapter):
         return {row[0]: self.to_value(row[1]) for row in rows}
 
     @_async_op
-    def batch_set(self, key_values: dict[str, Datatype]) -> None:
+    def batch_set(self, key_values: dict[str, Datatype]) -> int:
         stmt = (
             SQL(
                 """
@@ -284,10 +295,12 @@ class SQLite(Adapter):
 
         cursor = self._db.cursor()
         cursor.executemany(stmt, data)
+        row = cursor.rowcount
         self._db.commit()
+        return row
 
     @_async_op
-    def delete(self, key: str) -> None:
+    def delete(self, key: str) -> int:
         stmt = Composed(
             [
                 SQL("DELETE FROM {table} WHERE {key} = ").format(
@@ -338,21 +351,40 @@ class SQLite(Adapter):
         return [row[0] for row in rows]
 
     @_async_op
-    def set_expire(self, key: str, expires_at) -> None:
-        stmt = Composed(
-            [
-                SQL("UPDATE {table} SET {expires_at} = ").format(
-                    table=Identifier(self._tablename),
-                    expires_at=Identifier("expires_at"),
-                ),
-                Placeholder("?"),
-                SQL(" WHERE {key} = ").format(key=Identifier("key")),
-                Placeholder("?"),
-            ]
-        ).to_string()
+    def set_expire(self, key: str, ttl: int) -> int:
+        expires_at = self.get_expires_at(ttl)
+        stmt = (
+            SQL(
+                "UPDATE {table} SET {expires_at} = {expires_at_value}, {ttl} = {ttl_value} WHERE {key} = {key_value}"
+            )
+            .format(
+                table=Identifier(self._tablename),
+                expires_at=Identifier("expires_at"),
+                expires_at_value=Placeholder("?"),
+                ttl=Identifier("ttl"),
+                ttl_value=Placeholder("?"),
+                key=Identifier("key"),
+                key_value=Placeholder("?"),
+            )
+            .to_string()
+        )
         cursor = self._db.cursor()
-        cursor.execute(stmt, (expires_at, key))
+        cursor.execute(stmt, (expires_at, ttl, key))
+        row = cursor.rowcount
         self._db.commit()
+        return row
+
+    @_async_op
+    def get_expire(self, key) -> int | None:
+        stmt = (
+            SQL("SELECT ttl from {table} where key={key}")
+            .format(table=Identifier(self._tablename), key=Placeholder("?"))
+            .to_string()
+        )
+        cursor = self._db.cursor()
+        cursor.execute(stmt, (key,))
+        row = cursor.fetchone()
+        return row[0] if row else None
 
     def delete_expired_attributes(self):
         # TODO: worker always connected to the sqlite?? can be an option
