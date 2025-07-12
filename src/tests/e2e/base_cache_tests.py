@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from src.pycache.py_cache import PyCache
 from src.pycache.datatypes import String, List, Map, Numeric, Set, Queue
 from collections import deque
+from datetime import datetime
 
 
 @pytest.mark.asyncio
@@ -702,6 +703,126 @@ class BaseCacheTests(ABC):
             }
             assert set(keys) == expected_keys
 
+    # TTL Worker Tests
+
+    async def test_expired_keys_identification(self):
+        """Test that expired keys are properly identified without TTL worker."""
+        cache = self.create_cache()  # No TTL worker
+
+        async with cache.session() as session:
+            # Set keys with different expiration times
+            await session.set("expired_key", String("expired_value"))
+            await session.set("future_key", String("future_value"))
+            await session.set("persistent_key", String("persistent_value"))
+
+            # Set expiration times
+            await session.set_expire("expired_key", 1)  # Will expire in 1 second
+            await session.set_expire("future_key", 10)  # Will expire in 10 seconds
+
+            # Wait for expired_key to expire
+            await asyncio.sleep(1.5)
+
+            # Check that expired keys are identified correctly
+            expired_count = session.count_expired_keys()
+            assert expired_count == 1  # Only expired_key should be expired
+
+            # Verify the specific expired key
+            keys_with_expiry = session.get_all_keys_with_expiry()
+            expired_keys = [
+                key
+                for key, expiry in keys_with_expiry
+                if expiry and expiry < datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            ]
+            assert "expired_key" in expired_keys
+            assert "future_key" in expired_keys
+            assert "persistent_key" not in expired_keys
+
+    async def test_ttl_worker_basic_deletion(self):
+        """Test that TTL worker actually deletes expired keys."""
+        cache = self.create_cache()  # No TTL worker initially
+
+        async with cache.session() as session:
+            # Set keys with expiration
+            await session.set("expire_key1", String("value1"))
+            await session.set("expire_key2", String("value2"))
+            await session.set("persistent_key", String("persistent_value"))
+
+            # Set expiration times
+            await session.set_expire("expire_key1", 1)
+            await session.set_expire("expire_key2", 1)
+
+            # Wait for keys to expire
+            await asyncio.sleep(1.5)
+
+            # Verify keys are expired but still in database
+            expired_count = session.count_expired_keys()
+            assert expired_count == 2
+
+            # Start TTL worker
+            await cache.start_ttl_deletion(delete_interval=0.2)  # Cleanup every 200ms
+
+            # Wait for TTL worker to clean up (give it multiple cycles)
+            await asyncio.sleep(1.0)
+
+            # Check that expired keys are now deleted
+            expired_count = session.count_expired_keys()
+            assert expired_count == 0
+
+            # Verify persistent key still exists
+            assert await session.exists("persistent_key")
+            assert not await session.exists("expire_key1")
+            assert not await session.exists("expire_key2")
+
+    async def test_ttl_worker_stop_and_restart(self):
+        """Test stopping and restarting TTL worker."""
+        cache = self.create_cache()
+
+        async with cache.session() as session:
+            # Set keys with expiration
+            await session.set("expire_key", String("expire_value"))
+            await session.set_expire("expire_key", 1)
+
+            # Wait for key to expire
+            await asyncio.sleep(1.5)
+
+            # Verify key is expired
+            expired_count = session.count_expired_keys()
+            assert expired_count == 1
+
+            # Start TTL worker
+            await cache.start_ttl_deletion(delete_interval=0.2)
+
+            # Wait for cleanup
+            await asyncio.sleep(1.0)
+
+            # Verify key is deleted
+            expired_count = session.count_expired_keys()
+            assert expired_count == 0
+
+            # Stop TTL worker
+            await cache.stop_ttl_deletion()
+
+            # Set another expired key
+            await session.set("expire_key2", String("expire_value2"))
+            await session.set_expire("expire_key2", 1)
+
+            # Wait for key to expire
+            await asyncio.sleep(1.5)
+
+            # Verify key is expired but not deleted (TTL worker stopped)
+            expired_count = session.count_expired_keys()
+            assert expired_count == 1
+
+            # Restart TTL worker
+            await cache.start_ttl_deletion(delete_interval=0.2)
+
+            # Wait for cleanup
+            await asyncio.sleep(1.0)
+
+            # Verify key is now deleted
+            expired_count = session.count_expired_keys()
+            assert expired_count == 0
+
 
 class FileBasedCacheTests(BaseCacheTests):
     def create_temp_file(self):
@@ -725,4 +846,4 @@ class FileBasedCacheTests(BaseCacheTests):
         from src.pycache.adapters.SQLite import SQLite
 
         adapter = SQLite(self.temp_file)
-        return PyCache(adapter, 0.5)
+        return PyCache(adapter)  # No TTL worker by default

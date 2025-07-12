@@ -386,23 +386,55 @@ class SQLite(Adapter):
         row = cursor.fetchone()
         return row[0] if row else None
 
-    def delete_expired_attributes(self):
-        # TODO: worker always connected to the sqlite?? can be an option
-        # since this will work only in the workers and it will work in the same thread
-        self._db = sqlite.connect(self._connection_uri)
-        stmt = (
-            SQL(
-                "DELETE FROM {table} WHERE {expires_at} IS NOT NULL AND {expires_at} <= CURRENT_TIMESTAMP"
-            )
-            .format(
-                table=Identifier(self._tablename),
-                expires_at=Identifier("expires_at"),
-            )
-            .to_string()
-        )
-        cursor = self._db.cursor()
-        cursor.execute(stmt)
-        self._db.commit()
-
     def get_datetime_format(self):
         return "%Y-%m-%d %H:%M:%S"
+
+    def delete_expired_attributes(self):
+        """Delete all expired keys."""
+        with sqlite.connect(self._connection_uri) as db:
+            stmt = (
+                SQL(
+                    "DELETE FROM {table} WHERE {expires_at} IS NOT NULL AND {expires_at} <= CURRENT_TIMESTAMP"
+                )
+                .format(
+                    table=Identifier(self._tablename),
+                    expires_at=Identifier("expires_at"),
+                )
+                .to_string()
+            )
+            cursor = db.cursor()
+            cursor.execute(stmt)
+            db.commit()
+
+    def count_expired_keys(self) -> int:
+        """Count the number of expired keys in the database."""
+        with sqlite.connect(self._connection_uri) as db:
+            stmt = (
+                SQL(
+                    "SELECT COUNT(*) FROM {table} WHERE {expires_at} IS NOT NULL AND {expires_at} <= CURRENT_TIMESTAMP"
+                )
+                .format(
+                    table=Identifier(self._tablename),
+                    expires_at=Identifier("expires_at"),
+                )
+                .to_string()
+            )
+            cursor = db.cursor()
+            row = cursor.execute(stmt).fetchone()
+            return row[0] if row else 0
+
+    def get_all_keys_with_expiry(self) -> list[tuple[str, str]]:
+        """Get all keys with their expiry information for testing purposes."""
+        with sqlite.connect(self._connection_uri) as db:
+            stmt = (
+                SQL("SELECT {key}, {expires_at} FROM {table} ORDER BY {key}")
+                .format(
+                    key=Identifier("key"),
+                    expires_at=Identifier("expires_at"),
+                    table=Identifier(self._tablename),
+                )
+                .to_string()
+            )
+            cursor = db.cursor()
+            rows = cursor.execute(stmt).fetchall()
+            return [(row[0], row[1]) for row in rows]

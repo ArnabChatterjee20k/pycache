@@ -80,3 +80,15 @@ class Adapter(ABC):
         return (datetime.now(timezone.utc) + timedelta(seconds=ttl)).strftime(
             self.get_datetime_format()
         )
+
+    @abstractmethod
+    def delete_expired_attributes(self):
+        pass
+
+    @abstractmethod
+    def count_expired_keys(self) -> int:
+        pass
+
+    @abstractmethod
+    def get_all_keys_with_expiry(self) -> list[tuple[str, str]]:
+        pass
