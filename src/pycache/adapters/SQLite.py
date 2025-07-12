@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from functools import partial, wraps
 from .Adapter import Adapter
 from ..datatypes.Datatype import Datatype
-from ..sql import SQL, Composed, Identifier, Placeholder
+from ..sql import SQL, Composed, Identifier, Placeholder, Literal
 
 
 @dataclass
@@ -127,7 +127,8 @@ class SQLite(Adapter):
                             {key} TEXT NOT NULL UNIQUE,
                             {value} BLOB NOT NULL,
                             {created_at} DATETIME DEFAULT CURRENT_TIMESTAMP,
-                            {expires_at} DATETIME NULL
+                            {expires_at} DATETIME NULL,
+                            CHECK ({expires_at} IS NULL OR {expires_at} > {created_at})
                         )
                     """
                 ).format(
@@ -145,18 +146,60 @@ class SQLite(Adapter):
 
     @_async_op
     def create_index(self):
-        pass
+        index_name = f"{self._tablename}_expires_at_index"
+        # index automatically created on the key as it is unique
+        stmt = (
+            SQL("SELECT {name} FROM {table} WHERE type={index} AND name={index_name}")
+            .format(
+                name=Identifier("name"),
+                table=Identifier("sqlite_master"),
+                index=Literal("index"),
+                index_name=Placeholder("?"),
+            )
+            .to_string()
+        )
+
+        db: sqlite.Connection = self._db
+        cursor = db.cursor()
+        existing_index = cursor.execute(stmt, (index_name,)).fetchone()
+        if existing_index:
+            return
+
+        stmt = (
+            SQL("CREATE INDEX {name} ON {table}({expires_at})")
+            .format(
+                name=Identifier(index_name),
+                table=Identifier(self._tablename),
+                expires_at=Identifier("expires_at"),
+            )
+            .to_string()
+        )
+        cursor.execute(stmt)
+        self._db.commit()
+        # index info
+        # cursor = db.cursor()
+        # cursor.execute("SELECT name FROM sqlite_master WHERE type='index' ")
+        # print(cursor.fetchone()[0])
+
+        # cursor.execute("PRAGMA index_info('sqlite_autoindex_kv-store_1')")
+        # for row in cursor.fetchall():
+        #     print(row)
 
     @_async_op
     def get(self, key: str):
+        # SQLite doesn't provide select for update to lock table, we need to lock the entire database
+        # TODO: need to use distributed locks may be with a separate locks table
         stmt = Composed(
             [
-                SQL("SELECT {value} FROM {table} WHERE {key} = ").format(
+                SQL("SELECT {value} FROM {table} WHERE {key} = {key_name}").format(
                     value=Identifier("value"),
                     table=Identifier(self._tablename),
                     key=Identifier("key"),
+                    key_name=Placeholder("?"),
                 ),
-                Placeholder("?"),
+                SQL(
+                    "AND ({expires_at} IS NULL OR {expires_at} > CURRENT_TIMESTAMP)"
+                ).format(expires_at=Identifier("expires_at")),
             ]
         ).to_string()
 
@@ -178,8 +221,13 @@ class SQLite(Adapter):
                     user_value=Placeholder("?"),
                 ),
                 SQL(
-                    "ON CONFLICT({key}) DO UPDATE SET {value} = excluded.{value}"
-                ).format(key=Identifier("key"), value=Identifier("value")),
+                    "ON CONFLICT({key}) DO UPDATE SET {value} = excluded.{value}, {created_at} = CURRENT_TIMESTAMP, {expires_at} = NULL"
+                ).format(
+                    key=Identifier("key"),
+                    value=Identifier("value"),
+                    created_at=Identifier("created_at"),
+                    expires_at=Identifier("expires_at"),
+                ),
             ]
         ).to_string()
         cursor = self._db.cursor()
@@ -201,8 +249,12 @@ class SQLite(Adapter):
                     table=Identifier(self._tablename),
                     value=Identifier("value"),
                 ),
-                SQL("WHERE {key} in ({keys})").format(
-                    key=Identifier("key"), keys=Placeholder("?", len(keys))
+                SQL(
+                    "WHERE {key} in ({keys}) AND ({expires_at} IS NULL OR {expires_at} > CURRENT_TIMESTAMP)"
+                ).format(
+                    key=Identifier("key"),
+                    keys=Placeholder("?", len(keys)),
+                    expires_at=Identifier("expires_at"),
                 ),
             ]
         ).to_string()
@@ -246,16 +298,22 @@ class SQLite(Adapter):
         ).to_string()
         cursor = self._db.cursor()
         cursor.execute(stmt, (key,))
+        deleted_rows = cursor.rowcount
         self._db.commit()
+        return deleted_rows
 
     @_async_op
     def exists(self, key: str) -> bool:
         stmt = Composed(
             [
-                SQL("SELECT 1 FROM {table} WHERE {key} = ").format(
-                    table=Identifier(self._tablename), key=Identifier("key")
+                SQL("SELECT 1 FROM {table} WHERE {key} = {key_name}").format(
+                    table=Identifier(self._tablename),
+                    key=Identifier("key"),
+                    key_name=Placeholder("?"),
                 ),
-                Placeholder("?"),
+                SQL(
+                    "AND ({expires_at} IS NULL OR {expires_at} > CURRENT_TIMESTAMP)"
+                ).format(expires_at=Identifier("expires_at")),
             ]
         ).to_string()
         cursor = self._db.cursor()
@@ -265,8 +323,14 @@ class SQLite(Adapter):
     @_async_op
     def keys(self) -> list:
         stmt = (
-            SQL("SELECT {key} FROM {table}")
-            .format(key=Identifier("key"), table=Identifier(self._tablename))
+            SQL(
+                "SELECT {key} FROM {table} WHERE {expires_at} IS NULL OR {expires_at} > CURRENT_TIMESTAMP"
+            )
+            .format(
+                key=Identifier("key"),
+                table=Identifier(self._tablename),
+                expires_at=Identifier("expires_at"),
+            )
             .to_string()
         )
         cursor = self._db.cursor()
@@ -289,3 +353,24 @@ class SQLite(Adapter):
         cursor = self._db.cursor()
         cursor.execute(stmt, (expires_at, key))
         self._db.commit()
+
+    def delete_expired_attributes(self):
+        # TODO: worker always connected to the sqlite?? can be an option
+        # since this will work only in the workers and it will work in the same thread
+        self._db = sqlite.connect(self._connection_uri)
+        stmt = (
+            SQL(
+                "DELETE FROM {table} WHERE {expires_at} IS NOT NULL AND {expires_at} <= CURRENT_TIMESTAMP"
+            )
+            .format(
+                table=Identifier(self._tablename),
+                expires_at=Identifier("expires_at"),
+            )
+            .to_string()
+        )
+        cursor = self._db.cursor()
+        cursor.execute(stmt)
+        self._db.commit()
+
+    def get_datetime_format(self):
+        return "%Y-%m-%d %H:%M:%S"

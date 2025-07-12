@@ -57,6 +57,14 @@ class Adapter(ABC):
     def set_expire(self):
         pass
 
+    @abstractmethod
+    async def delete_expired_attributes(self):
+        pass
+
+    @abstractmethod
+    def get_datetime_format(self):
+        pass
+
     def to_bytes(self, data):
         return pickle.dumps(data)
 

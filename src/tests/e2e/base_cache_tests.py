@@ -1,6 +1,7 @@
 import pytest
 import tempfile
 import os
+import asyncio
 from abc import ABC, abstractmethod
 from src.pycache.py_cache import PyCache
 from src.pycache.datatypes import String, List, Map, Numeric, Set, Queue
@@ -248,164 +249,477 @@ class BaseCacheTests(ABC):
             result = await cache.get("deque_queue")
             assert list(self.extract_value(result)) == [1, 2, 3]
 
-    # Mixed Datatype Tests
-
-    async def test_mixed_datatypes(self):
+    async def test_queue_overwrite(self):
         async with self.cache.session() as cache:
-            # Store different datatypes
-            await cache.set("string_key", String("hello"))
+            await cache.set("queue_key", Queue([1, 2, 3]))
+            await cache.set("queue_key", Queue([4, 5, 6]))
+            result = await cache.get("queue_key")
+            assert list(self.extract_value(result)) == [4, 5, 6]
+
+    # TTL and Expiration Tests
+
+    async def test_set_expire_basic(self):
+        """Test basic expiration functionality."""
+        async with self.cache.session() as cache:
+            # Set a key with a short TTL
+            await cache.set("expire_key", String("expire_value"))
+            await cache.set_expire("expire_key", 1)  # 1 second TTL
+
+            # Key should exist immediately
+            assert await cache.exists("expire_key")
+            assert await cache.get("expire_key") == "expire_value"
+
+            # Wait for expiration
+            await asyncio.sleep(1.5)
+
+            # Key should be expired
+            assert not await cache.exists("expire_key")
+            assert await cache.get("expire_key") is None
+
+    async def test_set_expire_multiple_keys(self):
+        """Test expiration on multiple keys with different TTLs."""
+        async with self.cache.session() as cache:
+            # Set multiple keys with different TTLs
+            await cache.set("key1", String("value1"))
+            await cache.set("key2", String("value2"))
+            await cache.set("key3", String("value3"))
+
+            await cache.set_expire("key1", 1)  # 1 second
+            await cache.set_expire("key2", 7)  # 7 seconds
+            await cache.set_expire("key3", 7)  # 7 seconds
+
+            # All keys should exist initially
+            assert await cache.exists("key1")
+            assert await cache.exists("key2")
+            assert await cache.exists("key3")
+
+            # Wait 1.5 seconds - key1 should be expired
+            await asyncio.sleep(1.5)
+            assert not await cache.exists("key1")
+            assert await cache.exists("key2")
+            assert await cache.exists("key3")
+
+            await cache.set_expire("key2", 1)
+            await cache.set_expire("key3", 1)
+            # Wait another 1 second
+            await asyncio.sleep(1)
+            assert not await cache.exists("key1")
+            assert not await cache.exists("key2")
+            assert not await cache.exists("key3")
+
+    async def test_set_expire_on_nonexistent_key(self):
+        """Test setting expiration on a key that doesn't exist."""
+        async with self.cache.session() as cache:
+            # Try to set expiration on non-existent key
+            await cache.set_expire("nonexistent", 10)
+
+            # Key should still not exist
+            assert not await cache.exists("nonexistent")
+            assert await cache.get("nonexistent") is None
+
+    async def test_set_expire_overwrite(self):
+        """Test overwriting expiration time."""
+        async with self.cache.session() as cache:
+            await cache.set("overwrite_key", String("overwrite_value"))
+
+            # Set initial expiration
+            await cache.set_expire("overwrite_key", 1)
+
+            # Overwrite with longer expiration
+            await cache.set_expire("overwrite_key", 3)
+
+            # Wait 1.5 seconds - key should still exist due to overwritten TTL
+            await asyncio.sleep(1.5)
+            assert await cache.exists("overwrite_key")
+
+            # Wait another 2 seconds - key should be expired
+            await asyncio.sleep(2)
+            assert not await cache.exists("overwrite_key")
+
+    async def test_set_expire_zero_ttl(self):
+        """Test setting zero TTL(nothing should happen)"""
+        async with self.cache.session() as cache:
+            await cache.set("zero_ttl_key", String("zero_ttl_value"))
+            try:
+                await cache.set_expire("zero_ttl_key", 0)
+            except Exception as e:
+                assert isinstance(e, ValueError)
+
+            assert await cache.exists("zero_ttl_key")
+            assert await cache.get("zero_ttl_key") is not None
+
+    async def test_set_expire_negative_ttl(self):
+        """Test setting negative TTL (should not expire)."""
+        async with self.cache.session() as cache:
+            await cache.set("negative_ttl_key", String("negative_ttl_value"))
+            try:
+                await cache.set_expire("negative_ttl_key", -1)
+            except Exception as e:
+                assert isinstance(e, ValueError)
+
+            assert await cache.exists("negative_ttl_key")
+            assert await cache.get("negative_ttl_key") == "negative_ttl_value"
+
+    async def test_set_expire_all_datatypes(self):
+        """Test expiration with all datatypes."""
+        async with self.cache.session() as cache:
+            # Set different datatypes with expiration
+            await cache.set("string_key", String("string_value"))
             await cache.set("list_key", List([1, 2, 3]))
-            await cache.set("map_key", Map({"name": "John"}))
+            await cache.set("map_key", Map({"key": "value"}))
             await cache.set("numeric_key", Numeric(42))
             await cache.set("set_key", Set({1, 2, 3}))
             await cache.set("queue_key", Queue([1, 2, 3]))
 
-            # Retrieve and verify
+            # Set expiration for all
+            await cache.set_expire("string_key", 1)
+            await cache.set_expire("list_key", 1)
+            await cache.set_expire("map_key", 1)
+            await cache.set_expire("numeric_key", 1)
+            await cache.set_expire("set_key", 1)
+            await cache.set_expire("queue_key", 1)
+
+            # All should exist initially
+            assert await cache.exists("string_key")
+            assert await cache.exists("list_key")
+            assert await cache.exists("map_key")
+            assert await cache.exists("numeric_key")
+            assert await cache.exists("set_key")
+            assert await cache.exists("queue_key")
+
+            # Wait for expiration
+            await asyncio.sleep(1.5)
+
+            # All should be expired
+            assert not await cache.exists("string_key")
+            assert not await cache.exists("list_key")
+            assert not await cache.exists("map_key")
+            assert not await cache.exists("numeric_key")
+            assert not await cache.exists("set_key")
+            assert not await cache.exists("queue_key")
+
+    async def test_keys_after_expiration(self):
+        """Test that expired keys are not returned by keys() method."""
+        async with self.cache.session() as cache:
+            await cache.set("persistent_key", String("persistent_value"))
+            await cache.set("expire_key", String("expire_value"))
+
+            await cache.set_expire("expire_key", 1)
+
+            # Both keys should exist initially
+            keys = await cache.keys()
+            assert "persistent_key" in keys
+            assert "expire_key" in keys
+
+            # Wait for expiration
+            await asyncio.sleep(1.5)
+
+            # Only persistent key should remain
+            keys = await cache.keys()
+            assert "persistent_key" in keys
+            assert "expire_key" not in keys
+
+    async def test_batch_get_with_expired_keys(self):
+        """Test batch_get behavior with expired keys."""
+        async with self.cache.session() as cache:
+            await cache.set("persistent_key", String("persistent_value"))
+            await cache.set("expire_key", String("expire_value"))
+
+            await cache.set_expire("expire_key", 1)
+
+            # Both keys should be returned initially
+            results = await cache.batch_get(["persistent_key", "expire_key"])
+            assert "persistent_key" in results
+            assert "expire_key" in results
+
+            # Wait for expiration
+            await asyncio.sleep(1.5)
+
+            # Only persistent key should be returned
+            results = await cache.batch_get(["persistent_key", "expire_key"])
+            assert "persistent_key" in results
+            assert "expire_key" not in results
+
+    async def test_delete_expired_key(self):
+        """Test that deleting an expired key doesn't cause errors."""
+        async with self.cache.session() as cache:
+            await cache.set("expire_key", String("expire_value"))
+            await cache.set_expire("expire_key", 1)
+
+            # Wait for expiration
+            await asyncio.sleep(1.5)
+
+            # Deleting expired key should not raise an error
+            await cache.delete("expire_key")
+            assert not await cache.exists("expire_key")
+
+    async def test_set_expire_after_set(self):
+        """Test setting expiration after setting a value."""
+        async with self.cache.session() as cache:
+            await cache.set("key", String("value"))
+
+            # Set expiration after setting value
+            await cache.set_expire("key", 1)
+
+            # Key should exist
+            assert await cache.exists("key")
+            assert await cache.get("key") == "value"
+
+            # Wait for expiration
+            await asyncio.sleep(1.5)
+
+            # Key should be expired
+            assert not await cache.exists("key")
+            assert await cache.get("key") is None
+
+    async def test_set_expire_before_set(self):
+        """Test setting expiration before setting a value."""
+        async with self.cache.session() as cache:
+            # Set expiration before setting value
+            await cache.set_expire("key", 1)
+
+            # Key should not exist
+            assert not await cache.exists("key")
+
+            # Set the value
+            await cache.set("key", String("value"))
+
+            # Key should exist
+            assert await cache.exists("key")
+            assert await cache.get("key") == "value"
+
+            # Wait for expiration
+            await asyncio.sleep(1.5)
+
+            # Key should be expired
+            assert not await cache.exists("key")
+            assert await cache.get("key") is None
+
+    async def test_very_long_ttl(self):
+        """Test very long TTL values."""
+        async with self.cache.session() as cache:
+            await cache.set("long_ttl_key", String("long_ttl_value"))
+            await cache.set_expire("long_ttl_key", 3600)  # 1 hour
+
+            # Key should exist
+            assert await cache.exists("long_ttl_key")
+            assert await cache.get("long_ttl_key") == "long_ttl_value"
+
+            # Wait a short time - key should still exist
+            await asyncio.sleep(0.1)
+            assert await cache.exists("long_ttl_key")
+
+    async def test_expiration_with_special_characters(self):
+        """Test expiration with keys containing special characters."""
+        async with self.cache.session() as cache:
+            special_key = "key with spaces!@#$%^&*()"
+            await cache.set(special_key, String("special_value"))
+            await cache.set_expire(special_key, 1)
+
+            # Key should exist initially
+            assert await cache.exists(special_key)
+            assert await cache.get(special_key) == "special_value"
+
+            # Wait for expiration
+            await asyncio.sleep(1.5)
+
+            # Key should be expired
+            assert not await cache.exists(special_key)
+            assert await cache.get(special_key) is None
+
+    async def test_expiration_with_unicode_keys(self):
+        """Test expiration with unicode keys."""
+        async with self.cache.session() as cache:
+            unicode_key = "ключ_с_кириллицей"
+            await cache.set(unicode_key, String("unicode_value"))
+            await cache.set_expire(unicode_key, 1)
+
+            # Key should exist initially
+            assert await cache.exists(unicode_key)
+            assert await cache.get(unicode_key) == "unicode_value"
+
+            # Wait for expiration
+            await asyncio.sleep(1.5)
+
+            # Key should be expired
+            assert not await cache.exists(unicode_key)
+            assert await cache.get(unicode_key) is None
+
+    # Mixed Datatype Tests
+
+    async def test_mixed_datatypes(self):
+        async with self.cache.session() as cache:
+            # Test all datatypes in one session
+            await cache.set("string_key", String("hello"))
+            await cache.set("list_key", List([1, 2, 3]))
+            await cache.set("map_key", Map({"a": 1, "b": 2}))
+            await cache.set("numeric_key", Numeric(42))
+            await cache.set("set_key", Set({1, 2, 3}))
+            await cache.set("queue_key", Queue([1, 2, 3]))
+
+            # Verify all values
             assert self.extract_value(await cache.get("string_key")) == "hello"
             assert self.extract_value(await cache.get("list_key")) == [1, 2, 3]
-            assert self.extract_value(await cache.get("map_key")) == {"name": "John"}
+            assert self.extract_value(await cache.get("map_key")) == {"a": 1, "b": 2}
             assert self.extract_value(await cache.get("numeric_key")) == 42
             assert self.extract_value(await cache.get("set_key")) == {1, 2, 3}
             assert list(self.extract_value(await cache.get("queue_key"))) == [1, 2, 3]
 
     async def test_batch_mixed_datatypes(self):
         async with self.cache.session() as cache:
-            # Batch set mixed datatypes
+            # Test batch operations with mixed datatypes
             mixed_data = {
-                "str": String("hello"),
-                "lst": List([1, 2, 3]),
-                "mp": Map({"key": "value"}),
-                "num": Numeric(42),
-                "st": Set({1, 2, 3}),
-                "q": Queue([1, 2, 3]),
+                "string_key": String("hello"),
+                "list_key": List([1, 2, 3]),
+                "map_key": Map({"a": 1, "b": 2}),
+                "numeric_key": Numeric(42),
+                "set_key": Set({1, 2, 3}),
+                "queue_key": Queue([1, 2, 3]),
             }
+
             await cache.batch_set(mixed_data)
+            results = await cache.batch_get(list(mixed_data.keys()))
 
-            # Batch get and verify
-            results = await cache.batch_get(["str", "lst", "mp", "num", "st", "q"])
-            assert self.extract_value(results["str"]) == "hello"
-            assert self.extract_value(results["lst"]) == [1, 2, 3]
-            assert self.extract_value(results["mp"]) == {"key": "value"}
-            assert self.extract_value(results["num"]) == 42
-            assert self.extract_value(results["st"]) == {1, 2, 3}
-            assert list(self.extract_value(results["q"])) == [1, 2, 3]
-
-    # Edge Cases and Special Characters
+            assert self.extract_value(results["string_key"]) == "hello"
+            assert self.extract_value(results["list_key"]) == [1, 2, 3]
+            assert self.extract_value(results["map_key"]) == {"a": 1, "b": 2}
+            assert self.extract_value(results["numeric_key"]) == 42
+            assert self.extract_value(results["set_key"]) == {1, 2, 3}
+            assert list(self.extract_value(results["queue_key"])) == [1, 2, 3]
 
     async def test_empty_string_key_mixed(self):
         async with self.cache.session() as cache:
-            await cache.set("", String("empty key"))
+            await cache.set("", String("empty_key_value"))
             result = await cache.get("")
-            assert self.extract_value(result) == "empty key"
+            assert self.extract_value(result) == "empty_key_value"
 
     async def test_special_characters_in_key_mixed(self):
         async with self.cache.session() as cache:
-            special_key = "!@#$%^&*()_+-=[]{}|;':\",./<>?"
-            await cache.set(special_key, String("special value"))
+            special_key = "key with spaces!@#$%^&*()"
+            await cache.set(special_key, String("special_value"))
             result = await cache.get(special_key)
-            assert self.extract_value(result) == "special value"
+            assert self.extract_value(result) == "special_value"
 
     async def test_unicode_characters_mixed(self):
         async with self.cache.session() as cache:
-            unicode_key = "🚀🌟✨"
-            await cache.set(unicode_key, String("unicode value"))
+            unicode_key = "ключ_с_кириллицей"
+            await cache.set(unicode_key, String("unicode_value"))
             result = await cache.get(unicode_key)
-            assert self.extract_value(result) == "unicode value"
+            assert self.extract_value(result) == "unicode_value"
 
     async def test_large_value_mixed(self):
         async with self.cache.session() as cache:
-            large_value = "x" * 10000
-            await cache.set("large_key", String(large_value))
+            large_string = "x" * 10000
+            await cache.set("large_key", String(large_string))
             result = await cache.get("large_key")
-            assert self.extract_value(result) == large_value
-
-    # Complex Operations
+            assert self.extract_value(result) == large_string
 
     async def test_multiple_operations_sequence_mixed(self):
         async with self.cache.session() as cache:
-            # Set multiple values
+            # Complex sequence of operations
             await cache.set("key1", String("value1"))
             await cache.set("key2", List([1, 2, 3]))
-            await cache.set("key3", Map({"nested": "value"}))
-
-            # Verify they exist
-            assert await cache.exists("key1")
-            assert await cache.exists("key2")
-            assert await cache.exists("key3")
-
-            # Get all keys
-            keys = await cache.keys()
-            assert "key1" in keys
-            assert "key2" in keys
-            assert "key3" in keys
+            await cache.set("key3", Map({"a": 1}))
 
             # Update values
             await cache.set("key1", String("updated_value1"))
             await cache.set("key2", List([4, 5, 6]))
 
-            # Verify updates
+            # Delete and recreate
+            await cache.delete("key3")
+            await cache.set("key3", Numeric(999))
+
+            # Verify final state
             assert self.extract_value(await cache.get("key1")) == "updated_value1"
             assert self.extract_value(await cache.get("key2")) == [4, 5, 6]
+            assert self.extract_value(await cache.get("key3")) == 999
 
-            # Delete one key
-            await cache.delete("key1")
-            assert not await cache.exists("key1")
-            assert await cache.exists("key2")
-            assert await cache.exists("key3")
+            # Test batch operations
+            batch_data = {
+                "batch_key1": String("batch_value1"),
+                "batch_key2": Set({1, 2, 3}),
+                "batch_key3": Queue([1, 2, 3]),
+            }
+            await cache.batch_set(batch_data)
 
-            # Verify remaining keys
-            keys = await cache.keys()
-            assert "key1" not in keys
-            assert "key2" in keys
-            assert "key3" in keys
+            # Verify batch results
+            batch_results = await cache.batch_get(
+                ["batch_key1", "batch_key2", "batch_key3"]
+            )
+            assert self.extract_value(batch_results["batch_key1"]) == "batch_value1"
+            assert self.extract_value(batch_results["batch_key2"]) == {1, 2, 3}
+            assert list(self.extract_value(batch_results["batch_key3"])) == [1, 2, 3]
+
+            # Test keys method
+            all_keys = await cache.keys()
+            expected_keys = {
+                "key1",
+                "key2",
+                "key3",
+                "batch_key1",
+                "batch_key2",
+                "batch_key3",
+            }
+            assert set(all_keys) == expected_keys
 
     async def test_concurrent_access_simulation_mixed(self):
         async with self.cache.session() as cache:
             # Simulate concurrent-like operations by interleaving them
-            await cache.set("counter", Numeric(0))
-            await cache.set("list_data", List([]))
-            await cache.set("map_data", Map({}))
+            await cache.set("concurrent_key1", String("value1"))
+            await cache.set("concurrent_key2", List([1, 2, 3]))
+            await cache.set("concurrent_key3", Map({"a": 1}))
 
-            # Simulate multiple operations that might happen concurrently
-            for i in range(10):
-                # Update counter
-                current = await cache.get("counter")
-                await cache.set("counter", Numeric(self.extract_value(current) + 1))
-
-                # Update list
-                current_list = await cache.get("list_data")
-                updated_list = self.extract_value(current_list) + [i]
-                await cache.set("list_data", List(updated_list))
-
-                # Update map
-                current_map = await cache.get("map_data")
-                updated_map = self.extract_value(current_map).copy()
-                updated_map[f"key_{i}"] = f"value_{i}"
-                await cache.set("map_data", Map(updated_map))
+            # Interleaved operations
+            await cache.set("concurrent_key1", String("updated1"))
+            await cache.set("concurrent_key4", Numeric(42))
+            await cache.delete("concurrent_key2")
+            await cache.set("concurrent_key5", Set({1, 2, 3}))
 
             # Verify final state
-            final_counter = await cache.get("counter")
-            assert self.extract_value(final_counter) == 10
+            assert self.extract_value(await cache.get("concurrent_key1")) == "updated1"
+            assert await cache.get("concurrent_key2") is None
+            assert self.extract_value(await cache.get("concurrent_key3")) == {"a": 1}
+            assert self.extract_value(await cache.get("concurrent_key4")) == 42
+            assert self.extract_value(await cache.get("concurrent_key5")) == {1, 2, 3}
 
-            final_list = await cache.get("list_data")
-            assert self.extract_value(final_list) == list(range(10))
+            # Test exists method
+            assert await cache.exists("concurrent_key1")
+            assert not await cache.exists("concurrent_key2")
+            assert await cache.exists("concurrent_key3")
+            assert await cache.exists("concurrent_key4")
+            assert await cache.exists("concurrent_key5")
 
-            final_map = await cache.get("map_data")
-            expected_map = {f"key_{i}": f"value_{i}" for i in range(10)}
-            assert self.extract_value(final_map) == expected_map
+            # Test keys method
+            keys = await cache.keys()
+            expected_keys = {
+                "concurrent_key1",
+                "concurrent_key3",
+                "concurrent_key4",
+                "concurrent_key5",
+            }
+            assert set(keys) == expected_keys
 
 
 class FileBasedCacheTests(BaseCacheTests):
     def create_temp_file(self):
-        """Create a temporary file for the cache."""
-        self.temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
-        return self.temp_file.name
+        return tempfile.NamedTemporaryFile(delete=False, suffix=".db").name
 
     def teardown_method(self):
-        """Clean up temporary file."""
+        """Clean up temporary files after tests."""
         super().teardown_method()
-        if hasattr(self, "temp_file") and self.temp_file:
-            try:
-                os.unlink(self.temp_file.name)
-            except OSError:
-                pass  # File might already be deleted
+        # Clean up any temporary files created during tests
+        for attr in dir(self):
+            if attr.startswith("temp_file"):
+                file_path = getattr(self, attr, None)
+                if file_path and os.path.exists(file_path):
+                    try:
+                        os.unlink(file_path)
+                    except OSError:
+                        pass  # File might already be deleted
+
+    def create_cache(self):
+        self.temp_file = self.create_temp_file()
+        from src.pycache.adapters.SQLite import SQLite
+
+        adapter = SQLite(self.temp_file)
+        return PyCache(adapter, 0.5)

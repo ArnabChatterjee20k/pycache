@@ -1,11 +1,22 @@
+from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 from .adapters.Adapter import Adapter
 from .datatypes.Datatype import Datatype
+from .worker.TTLWorker import TTLWorker
 
 
 class PyCache:
-    def __init__(self, adapter: Adapter):
+    def __init__(self, adapter: Adapter, ttl_interval=-1):
         self.adapter = adapter
+        self.ttl = ttl_interval
+        self._ttl_worker = None
+        if ttl_interval != -1 and ttl_interval <= 0:
+            raise ValueError("TTL interval should be more than 0 seconds")
+        elif ttl_interval > 0:
+            self._ttl_worker = TTLWorker(
+                self.adapter.delete_expired_attributes, interval=ttl_interval
+            )
+            self._ttl_worker.start()
 
     async def __aenter__(self):
         await self.adapter.connect()
@@ -48,14 +59,28 @@ class PyCache:
     async def keys(self):
         return await self.adapter.keys()
 
-    async def set_expire(self, key, expires_at):
+    async def set_expire(self, key, ttl):
+        if not isinstance(ttl, (float, int)):
+            raise TypeError("ttl must be numeric")
+
+        if ttl < 1:
+            raise ValueError("ttl must be atleast 1second")
+
+        expires_at = (datetime.now(timezone.utc) + timedelta(seconds=ttl)).strftime(
+            self.adapter.get_datetime_format()
+        )
         return await self.adapter.set_expire(key, expires_at)
+
+    async def stop_ttl(self):
+        if self._ttl_worker:
+            self._ttl_worker.stop()
 
     @asynccontextmanager
     async def session(self):
         try:
             await self.adapter.connect()
             await self.adapter.create()
+            await self.adapter.create_index()
             yield self
         finally:
             await self.adapter.close()
