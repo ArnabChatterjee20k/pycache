@@ -402,6 +402,7 @@ class BaseCacheTests(ABC):
     async def test_keys_after_expiration(self):
         """Test that expired keys are not returned by keys() method."""
         async with self.cache.session() as cache:
+            await self.cache.stop_ttl_deletion()
             await cache.set("persistent_key", String("persistent_value"))
             await cache.set("expire_key", String("expire_value"))
 
@@ -422,6 +423,7 @@ class BaseCacheTests(ABC):
 
     async def test_batch_get_with_expired_keys(self):
         """Test batch_get behavior with expired keys."""
+        await self.cache.stop_ttl_deletion()
         async with self.cache.session() as cache:
             await cache.set("persistent_key", String("persistent_value"))
             await cache.set("expire_key", String("expire_value"))
@@ -723,11 +725,11 @@ class BaseCacheTests(ABC):
             await asyncio.sleep(1.5)
 
             # Check that expired keys are identified correctly
-            expired_count = session.count_expired_keys()
+            expired_count = cache.count_expired_keys()
             assert expired_count == 1  # Only expired_key should be expired
 
             # Verify the specific expired key
-            keys_with_expiry = session.get_all_keys_with_expiry()
+            keys_with_expiry = cache.get_all_keys_with_expiry()
             expired_keys = [
                 key
                 for key, expiry in keys_with_expiry
@@ -755,7 +757,7 @@ class BaseCacheTests(ABC):
             await asyncio.sleep(1.5)
 
             # Verify keys are expired but still in database
-            expired_count = session.count_expired_keys()
+            expired_count = cache.count_expired_keys()
             assert expired_count == 2
 
             # Start TTL worker
@@ -765,7 +767,7 @@ class BaseCacheTests(ABC):
             await asyncio.sleep(1.0)
 
             # Check that expired keys are now deleted
-            expired_count = session.count_expired_keys()
+            expired_count = cache.count_expired_keys()
             assert expired_count == 0
 
             # Verify persistent key still exists
@@ -786,7 +788,7 @@ class BaseCacheTests(ABC):
             await asyncio.sleep(1.5)
 
             # Verify key is expired
-            expired_count = session.count_expired_keys()
+            expired_count = cache.count_expired_keys()
             assert expired_count == 1
 
             # Start TTL worker
@@ -796,7 +798,7 @@ class BaseCacheTests(ABC):
             await asyncio.sleep(1.0)
 
             # Verify key is deleted
-            expired_count = session.count_expired_keys()
+            expired_count = cache.count_expired_keys()
             assert expired_count == 0
 
             # Stop TTL worker
@@ -810,7 +812,7 @@ class BaseCacheTests(ABC):
             await asyncio.sleep(1.5)
 
             # Verify key is expired but not deleted (TTL worker stopped)
-            expired_count = session.count_expired_keys()
+            expired_count = cache.count_expired_keys()
             assert expired_count == 1
 
             # Restart TTL worker
@@ -820,7 +822,7 @@ class BaseCacheTests(ABC):
             await asyncio.sleep(1.0)
 
             # Verify key is now deleted
-            expired_count = session.count_expired_keys()
+            expired_count = cache.count_expired_keys()
             assert expired_count == 0
 
 

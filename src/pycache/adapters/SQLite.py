@@ -27,12 +27,22 @@ def _async_op(fn):
     return wrapper
 
 
+# Factory class
 class SQLite(Adapter):
+    _operation_queue: SimpleQueue[OperationPayload] = None
+    _executor = None
+    _running = None
+
     def __init__(self, *args):
         super().__init__(*args)
-        self._operation_queue: SimpleQueue[OperationPayload] = SimpleQueue()
-        self._executor = Thread(target=self._run_executor, daemon=True)
-        self._running = False
+
+    # HACK: the connect() returns the SQLiteSession
+    # and SQLiteSession will have the local scope of the state and no state will be shared
+    async def connect(self) -> "SQLiteSession":
+        # Return a fresh SQLiteSession on connect
+        session = SQLiteSession(self._connection_uri, self._tablename)
+        await session.connect()
+        return session
 
     async def __aenter__(self):
         # return await self
@@ -93,16 +103,6 @@ class SQLite(Adapter):
                 payload.future.get_loop().call_soon_threadsafe(
                     set_future_exception, payload.future, e
                 )
-
-    async def connect(self) -> "SQLite":
-        self._running = True
-        self._executor.start()
-
-        def connector():
-            return sqlite.connect(self._connection_uri)
-
-        self._db = await self._execute(connector)
-        return self
 
     async def close(self):
         try:
@@ -438,3 +438,23 @@ class SQLite(Adapter):
             cursor = db.cursor()
             rows = cursor.execute(stmt).fetchall()
             return [(row[0], row[1]) for row in rows]
+
+
+# Actual session
+class SQLiteSession(SQLite):
+    def __init__(self, *args):
+        super().__init__(*args)
+
+        self._operation_queue: SimpleQueue[OperationPayload] = SimpleQueue()
+        self._executor = Thread(target=self._run_executor, daemon=True)
+        self._running = False
+
+    async def connect(self) -> "SQLite":
+        self._running = True
+        self._executor.start()
+
+        def connector():
+            return sqlite.connect(self._connection_uri)
+
+        self._db = await self._execute(connector)
+        return self

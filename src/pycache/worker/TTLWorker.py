@@ -22,10 +22,12 @@ class TTLWorker:
             await asyncio.sleep(self._interval)
 
     async def stop(self):
-        self._running = False
-        if self._task:
+        if self._task and not self._task.done():
+            self._running = False
             self._task.cancel()
             try:
                 await self._task
             except asyncio.CancelledError:
                 pass
+            finally:
+                self._task = None

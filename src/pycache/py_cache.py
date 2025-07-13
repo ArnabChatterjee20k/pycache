@@ -5,10 +5,9 @@ from .datatypes.Datatype import Datatype
 from .worker.TTLWorker import TTLWorker
 
 
-class PyCache:
+class Session:
     def __init__(self, adapter: Adapter):
         self._adapter = adapter
-        self._ttl_worker = None
 
     async def __aenter__(self):
         await self._adapter.connect()
@@ -63,6 +62,22 @@ class PyCache:
     async def get_expire(self, key) -> int:
         return await self._adapter.get_expire(key)
 
+
+class PyCache:
+    def __init__(self, adapter: Adapter):
+        self._adapter = adapter
+        self._ttl_worker = None
+
+    @asynccontextmanager
+    async def session(self):
+        try:
+            adapter = await self._adapter.connect()
+            await adapter.create()
+            await adapter.create_index()
+            yield Session(adapter)
+        finally:
+            await adapter.close()
+
     async def start_ttl_deletion(self, delete_interval=0.5):
         if delete_interval <= 0:
             return
@@ -83,13 +98,3 @@ class PyCache:
 
     def get_all_keys_with_expiry(self) -> list[tuple[str, str]]:
         return self._adapter.get_all_keys_with_expiry()
-
-    @asynccontextmanager
-    async def session(self):
-        try:
-            await self._adapter.connect()
-            await self._adapter.create()
-            await self._adapter.create_index()
-            yield self
-        finally:
-            await self._adapter.close()
