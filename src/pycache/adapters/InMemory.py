@@ -12,8 +12,8 @@ class InMemory(Adapter):
     _global_lock = threading.Lock()
     _debug_mode = False
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, connection_uri="", *args):
+        super().__init__(connection_uri=connection_uri, *args)
         self._connected = False
 
     async def connect(self) -> "InMemory":

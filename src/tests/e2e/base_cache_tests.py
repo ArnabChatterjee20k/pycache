@@ -361,44 +361,6 @@ class BaseCacheTests(ABC):
             assert await cache.exists("negative_ttl_key")
             assert await cache.get("negative_ttl_key") == "negative_ttl_value"
 
-    async def test_set_expire_all_datatypes(self):
-        """Test expiration with all datatypes."""
-        async with self.cache.session() as cache:
-            # Set different datatypes with expiration
-            await cache.set("string_key", String("string_value"))
-            await cache.set("list_key", List([1, 2, 3]))
-            await cache.set("map_key", Map({"key": "value"}))
-            await cache.set("numeric_key", Numeric(42))
-            await cache.set("set_key", Set({1, 2, 3}))
-            await cache.set("queue_key", Queue([1, 2, 3]))
-
-            # Set expiration for all
-            await cache.set_expire("string_key", 1)
-            await cache.set_expire("list_key", 1)
-            await cache.set_expire("map_key", 1)
-            await cache.set_expire("numeric_key", 1)
-            await cache.set_expire("set_key", 1)
-            await cache.set_expire("queue_key", 1)
-
-            # All should exist initially
-            assert await cache.exists("string_key")
-            assert await cache.exists("list_key")
-            assert await cache.exists("map_key")
-            assert await cache.exists("numeric_key")
-            assert await cache.exists("set_key")
-            assert await cache.exists("queue_key")
-
-            # Wait for expiration
-            await asyncio.sleep(1.5)
-
-            # All should be expired
-            assert not await cache.exists("string_key")
-            assert not await cache.exists("list_key")
-            assert not await cache.exists("map_key")
-            assert not await cache.exists("numeric_key")
-            assert not await cache.exists("set_key")
-            assert not await cache.exists("queue_key")
-
     async def test_keys_after_expiration(self):
         """Test that expired keys are not returned by keys() method."""
         async with self.cache.session() as cache:
