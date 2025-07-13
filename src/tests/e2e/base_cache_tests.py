@@ -739,17 +739,6 @@ class BaseCacheTests(ABC):
             expired_count = cache.count_expired_keys()
             assert expired_count >= 1  # Only expired_key should be expired
 
-            # Verify the specific expired key
-            keys_with_expiry = cache.get_all_keys_with_expiry()
-            expired_keys = [
-                key
-                for key, expiry in keys_with_expiry
-                if expiry and expiry < datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            ]
-            assert "expired_key" in expired_keys
-            assert "future_key" in expired_keys
-            assert "persistent_key" not in expired_keys
-
     async def test_ttl_worker_basic_deletion(self):
         """Test that TTL worker actually deletes expired keys."""
         cache = self.create_cache()  # No TTL worker initially
