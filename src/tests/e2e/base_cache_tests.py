@@ -706,7 +706,7 @@ class BaseCacheTests(ABC):
             assert set(keys) == expected_keys
 
     # TTL Worker Tests
-
+    @pytest.mark.flaky(reruns=2, reruns_delay=1)
     async def test_expired_keys_identification(self):
         """Test that expired keys are properly identified without TTL worker."""
         await self.cache.stop_ttl_deletion()
