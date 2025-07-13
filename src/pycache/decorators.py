@@ -70,7 +70,11 @@ def cache(ttl=-1, adapter=InMemory(), return_type=String):
 
 
 def rate_limit(
-    limit=-1, ttl=-1, exception=Exception("Rate limit exceeded"), adapter=InMemory()
+    limit=-1,
+    ttl=-1,
+    get_key: callable = None,
+    exception=Exception("Rate limit exceeded"),
+    adapter=InMemory(),
 ):
     if not isinstance(adapter, Adapter):
         raise TypeError("adapter must be a instance of Adapter")
@@ -85,12 +89,14 @@ def rate_limit(
                     if iscoroutinefunction(fn)
                     else fn(*args, **kwargs)
                 )
-            key = get_hash_key("rate_limit", fn, *args, **kwargs)
+            if get_key:
+                key = get_key()
+            else:
+                key = get_hash_key("rate_limit", fn, *args, **kwargs)
 
             async with pycache.session() as session:
                 value = await session.get(key)
                 count = int(value) if value else 0
-
                 if count >= limit:
                     raise exception
 
