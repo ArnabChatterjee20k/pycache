@@ -12,6 +12,7 @@ A powerful Python caching library with TTL support, multiple backend storage opt
 - **Single level Transaction Support**: ACID transactions for data consistency
 - **Multiple Data Types**: Support for String, List, Map, Numeric, Set, and Queue data types
 - **Sharding for Mysql backend**: soon
+- **Utils**: Common backend-specific decorators like rate limiter, cache functions,etc(great place to contribute)
 
 ## Installation
 
