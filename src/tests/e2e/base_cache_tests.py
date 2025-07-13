@@ -709,8 +709,8 @@ class BaseCacheTests(ABC):
 
     async def test_expired_keys_identification(self):
         """Test that expired keys are properly identified without TTL worker."""
+        await self.cache.stop_ttl_deletion()
         cache = self.create_cache()  # No TTL worker
-
         async with cache.session() as session:
             # Set keys with different expiration times
             await session.set("expired_key", String("expired_value"))
@@ -824,6 +824,339 @@ class BaseCacheTests(ABC):
             # Verify key is now deleted
             expired_count = cache.count_expired_keys()
             assert expired_count == 0
+
+    # Transaction Tests
+
+    async def test_successful_transaction(self):
+        """Test that a successful transaction commits all changes."""
+        async with self.cache.session() as session:
+            # Set initial values
+            await session.set("key1", String("initial1"))
+            await session.set("key2", String("initial2"))
+
+            # Start transaction and modify values
+            async with session.with_transaction() as tx:
+                await tx.set("key1", String("updated1"))
+                await tx.set("key2", String("updated2"))
+                await tx.set("key3", String("new3"))
+
+            # Verify all changes were committed
+            assert self.extract_value(await session.get("key1")) == "updated1"
+            assert self.extract_value(await session.get("key2")) == "updated2"
+            assert self.extract_value(await session.get("key3")) == "new3"
+
+    async def test_transaction_rollback_on_exception(self):
+        """Test that a transaction rolls back when an exception occurs."""
+        async with self.cache.session() as session:
+            # Set initial values
+            await session.set("key1", String("initial1"))
+            await session.set("key2", String("initial2"))
+
+            # Start transaction and modify values, then raise exception
+            try:
+                async with session.with_transaction() as tx:
+                    await tx.set("key1", String("updated1"))
+                    await tx.set("key2", String("updated2"))
+                    await tx.set("key3", String("new3"))
+                    raise Exception("Simulated error")
+            except Exception:
+                pass  # Expected exception
+
+            # Verify all changes were rolled back
+            assert self.extract_value(await session.get("key1")) == "initial1"
+            assert self.extract_value(await session.get("key2")) == "initial2"
+            assert await session.get("key3") is None
+
+    async def test_transaction_with_batch_operations(self):
+        """Test transactions with batch operations."""
+        async with self.cache.session() as session:
+            # Set initial values
+            await session.set("key1", String("initial1"))
+
+            # Start transaction with batch operations
+            async with session.with_transaction() as tx:
+                await tx.batch_set(
+                    {
+                        "key1": String("updated1"),
+                        "key2": String("new2"),
+                        "key3": String("new3"),
+                    }
+                )
+
+            # Verify all changes were committed
+            assert self.extract_value(await session.get("key1")) == "updated1"
+            assert self.extract_value(await session.get("key2")) == "new2"
+            assert self.extract_value(await session.get("key3")) == "new3"
+
+    async def test_transaction_rollback_with_batch_operations(self):
+        """Test transaction rollback with batch operations."""
+        async with self.cache.session() as session:
+            # Set initial values
+            await session.set("key1", String("initial1"))
+
+            # Start transaction with batch operations, then raise exception
+            try:
+                async with session.with_transaction() as tx:
+                    await tx.batch_set(
+                        {
+                            "key1": String("updated1"),
+                            "key2": String("new2"),
+                            "key3": String("new3"),
+                        }
+                    )
+                    raise Exception("Simulated error")
+            except Exception:
+                pass  # Expected exception
+
+            # Verify all changes were rolled back
+            assert self.extract_value(await session.get("key1")) == "initial1"
+            assert await session.get("key2") is None
+            assert await session.get("key3") is None
+
+    async def test_transaction_with_delete_operations(self):
+        """Test transactions with delete operations."""
+        async with self.cache.session() as session:
+            # Set initial values
+            await session.set("key1", String("value1"))
+            await session.set("key2", String("value2"))
+            await session.set("key3", String("value3"))
+
+            # Start transaction and delete some keys
+            async with session.with_transaction() as tx:
+                await tx.delete("key1")
+                await tx.delete("key2")
+
+            # Verify deletions were committed
+            assert await session.get("key1") is None
+            assert await session.get("key2") is None
+            assert self.extract_value(await session.get("key3")) == "value3"
+
+    async def test_transaction_rollback_with_delete_operations(self):
+        """Test transaction rollback with delete operations."""
+        async with self.cache.session() as session:
+            # Set initial values
+            await session.set("key1", String("value1"))
+            await session.set("key2", String("value2"))
+
+            # Start transaction and delete keys, then raise exception
+            try:
+                async with session.with_transaction() as tx:
+                    await tx.delete("key1")
+                    await tx.delete("key2")
+                    raise Exception("Simulated error")
+            except Exception:
+                pass  # Expected exception
+
+            # Verify deletions were rolled back
+            assert self.extract_value(await session.get("key1")) == "value1"
+            assert self.extract_value(await session.get("key2")) == "value2"
+
+    async def test_transaction_with_mixed_operations(self):
+        """Test transactions with mixed operations (set, delete, batch)."""
+        async with self.cache.session() as session:
+            # Set initial values
+            await session.set("key1", String("initial1"))
+            await session.set("key2", String("initial2"))
+            await session.set("key3", String("initial3"))
+
+            # Start transaction with mixed operations
+            async with session.with_transaction() as tx:
+                await tx.set("key1", String("updated1"))  # Update
+                await tx.delete("key2")  # Delete
+                await tx.batch_set(
+                    {"key3": String("updated3"), "key4": String("new4")}  # Batch set
+                )
+
+            # Verify all operations were committed
+            assert self.extract_value(await session.get("key1")) == "updated1"
+            assert await session.get("key2") is None
+            assert self.extract_value(await session.get("key3")) == "updated3"
+            assert self.extract_value(await session.get("key4")) == "new4"
+
+    async def test_transaction_rollback_with_mixed_operations(self):
+        """Test transaction rollback with mixed operations."""
+        async with self.cache.session() as session:
+            # Set initial values
+            await session.set("key1", String("initial1"))
+            await session.set("key2", String("initial2"))
+            await session.set("key3", String("initial3"))
+
+            # Start transaction with mixed operations, then raise exception
+            try:
+                async with session.with_transaction() as tx:
+                    await tx.set("key1", String("updated1"))  # Update
+                    await tx.delete("key2")  # Delete
+                    await tx.batch_set(
+                        {  # Batch set
+                            "key3": String("updated3"),
+                            "key4": String("new4"),
+                        }
+                    )
+                    raise Exception("Simulated error")
+            except Exception:
+                pass  # Expected exception
+
+            # Verify all operations were rolled back
+            assert self.extract_value(await session.get("key1")) == "initial1"
+            assert self.extract_value(await session.get("key2")) == "initial2"
+            assert self.extract_value(await session.get("key3")) == "initial3"
+            assert await session.get("key4") is None
+
+    async def test_transaction_with_all_datatypes(self):
+        """Test transactions with all datatypes."""
+        async with self.cache.session() as session:
+            # Start transaction with all datatypes
+            async with session.with_transaction() as tx:
+                await tx.set("string_key", String("hello"))
+                await tx.set("list_key", List([1, 2, 3]))
+                await tx.set("map_key", Map({"a": 1, "b": 2}))
+                await tx.set("numeric_key", Numeric(42))
+                await tx.set("set_key", Set({1, 2, 3}))
+                await tx.set("queue_key", Queue([1, 2, 3]))
+
+            # Verify all values were committed
+            assert self.extract_value(await session.get("string_key")) == "hello"
+            assert self.extract_value(await session.get("list_key")) == [1, 2, 3]
+            assert self.extract_value(await session.get("map_key")) == {"a": 1, "b": 2}
+            assert self.extract_value(await session.get("numeric_key")) == 42
+            assert self.extract_value(await session.get("set_key")) == {1, 2, 3}
+            assert list(self.extract_value(await session.get("queue_key"))) == [1, 2, 3]
+
+    async def test_transaction_rollback_with_all_datatypes(self):
+        """Test transaction rollback with all datatypes."""
+        async with self.cache.session() as session:
+            # Start transaction with all datatypes, then raise exception
+            try:
+                async with session.with_transaction() as tx:
+                    await tx.set("string_key", String("hello"))
+                    await tx.set("list_key", List([1, 2, 3]))
+                    await tx.set("map_key", Map({"a": 1, "b": 2}))
+                    await tx.set("numeric_key", Numeric(42))
+                    await tx.set("set_key", Set({1, 2, 3}))
+                    await tx.set("queue_key", Queue([1, 2, 3]))
+                    raise Exception("Simulated error")
+            except Exception:
+                pass  # Expected exception
+
+            # Verify all values were rolled back
+            assert await session.get("string_key") is None
+            assert await session.get("list_key") is None
+            assert await session.get("map_key") is None
+            assert await session.get("numeric_key") is None
+            assert await session.get("set_key") is None
+            assert await session.get("queue_key") is None
+
+    async def test_transaction_with_expire_operations(self):
+        """Test transactions with expire operations."""
+        async with self.cache.session() as session:
+            # Set initial values
+            await session.set("key1", String("value1"))
+            await session.set("key2", String("value2"))
+
+            # Start transaction and set expiration
+            async with session.with_transaction() as tx:
+                await tx.set_expire("key1", 60)  # 60 seconds
+                await tx.set_expire("key2", 120)  # 120 seconds
+
+            # Verify expiration was set
+            assert await session.get_expire("key1") == 60
+            assert await session.get_expire("key2") == 120
+
+    async def test_transaction_rollback_with_expire_operations(self):
+        """Test transaction rollback with expire operations."""
+        async with self.cache.session() as session:
+            # Set initial values
+            await session.set("key1", String("value1"))
+            await session.set("key2", String("value2"))
+
+            # Start transaction and set expiration, then raise exception
+            try:
+                async with session.with_transaction() as tx:
+                    await tx.set_expire("key1", 60)  # 60 seconds
+                    await tx.set_expire("key2", 120)  # 120 seconds
+                    raise Exception("Simulated error")
+            except Exception:
+                pass  # Expected exception
+
+            # Verify expiration was rolled back
+            assert await session.get_expire("key1") is None
+            assert await session.get_expire("key2") is None
+
+    async def test_transaction_with_large_data(self):
+        """Test transactions with large amounts of data."""
+        async with self.cache.session() as session:
+            # Create large dataset
+            large_data = {}
+            for i in range(100):
+                large_data[f"key_{i}"] = String(f"value_{i}")
+
+            # Start transaction and set large dataset
+            async with session.with_transaction() as tx:
+                await tx.batch_set(large_data)
+
+            # Verify all data was committed
+            keys = [f"key_{i}" for i in range(100)]
+            results = await session.batch_get(keys)
+            for i in range(100):
+                assert self.extract_value(results[f"key_{i}"]) == f"value_{i}"
+
+    async def test_transaction_rollback_with_large_data(self):
+        """Test transaction rollback with large amounts of data."""
+        async with self.cache.session() as session:
+            # Create large dataset
+            large_data = {}
+            for i in range(100):
+                large_data[f"key_{i}"] = String(f"value_{i}")
+
+            # Start transaction and set large dataset, then raise exception
+            try:
+                async with session.with_transaction() as tx:
+                    await tx.batch_set(large_data)
+                    raise Exception("Simulated error")
+            except Exception:
+                pass  # Expected exception
+
+            # Verify all data was rolled back
+            keys = [f"key_{i}" for i in range(100)]
+            results = await session.batch_get(keys)
+            for i in range(100):
+                assert results.get(f"key_{i}") is None
+
+    async def test_transaction_error_handling(self):
+        """Test that different types of errors are properly handled in transactions."""
+        async with self.cache.session() as session:
+            # Set initial value
+            await session.set("key1", String("initial"))
+
+            # Test with ValueError
+            try:
+                async with session.with_transaction() as tx:
+                    await tx.set("key1", String("updated"))
+                    raise ValueError("Test ValueError")
+            except ValueError:
+                pass
+
+            assert self.extract_value(await session.get("key1")) == "initial"
+
+            # Test with TypeError
+            try:
+                async with session.with_transaction() as tx:
+                    await tx.set("key1", String("updated"))
+                    raise TypeError("Test TypeError")
+            except TypeError:
+                pass
+
+            assert self.extract_value(await session.get("key1")) == "initial"
+
+            # Test with RuntimeError
+            try:
+                async with session.with_transaction() as tx:
+                    await tx.set("key1", String("updated"))
+                    raise RuntimeError("Test RuntimeError")
+            except RuntimeError:
+                pass
+
+            assert self.extract_value(await session.get("key1")) == "initial"
 
 
 class FileBasedCacheTests(BaseCacheTests):

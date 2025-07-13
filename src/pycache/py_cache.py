@@ -62,6 +62,16 @@ class Session:
     async def get_expire(self, key) -> int:
         return await self._adapter.get_expire(key)
 
+    @asynccontextmanager
+    async def with_transaction(self):
+        adapter: Adapter = self._adapter
+        await adapter.begin()
+        try:
+            yield Session(adapter)
+            await adapter.commit()
+        except:
+            await adapter.rollback()
+
 
 class PyCache:
     def __init__(self, adapter: Adapter):

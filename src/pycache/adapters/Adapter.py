@@ -70,6 +70,18 @@ class Adapter(ABC):
     def get_datetime_format(self) -> str:
         pass
 
+    @abstractmethod
+    def begin(self):
+        pass
+
+    @abstractmethod
+    def commit(self):
+        pass
+
+    @abstractmethod
+    def rollback(self):
+        pass
+
     def to_bytes(self, data):
         return pickle.dumps(data)
 

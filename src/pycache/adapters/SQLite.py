@@ -32,6 +32,7 @@ class SQLite(Adapter):
     _operation_queue: SimpleQueue[OperationPayload] = None
     _executor = None
     _running = None
+    _in_transaction = False
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -243,7 +244,8 @@ class SQLite(Adapter):
         ).to_string()
         cursor = self._db.cursor()
         cursor.execute(stmt, (key, self.to_bytes(value)))
-        self._db.commit()
+        if not self._in_transaction:
+            self._db.commit()
 
         stmt = SQL("SELECT last_insert_rowid()").to_string()
         cursor = self._db.cursor()
@@ -296,7 +298,8 @@ class SQLite(Adapter):
         cursor = self._db.cursor()
         cursor.executemany(stmt, data)
         row = cursor.rowcount
-        self._db.commit()
+        if not self._in_transaction:
+            self._db.commit()
         return row
 
     @_async_op
@@ -312,7 +315,8 @@ class SQLite(Adapter):
         cursor = self._db.cursor()
         cursor.execute(stmt, (key,))
         deleted_rows = cursor.rowcount
-        self._db.commit()
+        if not self._in_transaction:
+            self._db.commit()
         return deleted_rows
 
     @_async_op
@@ -371,8 +375,24 @@ class SQLite(Adapter):
         cursor = self._db.cursor()
         cursor.execute(stmt, (expires_at, ttl, key))
         row = cursor.rowcount
-        self._db.commit()
+        if not self._in_transaction:
+            self._db.commit()
         return row
+
+    @_async_op
+    def begin(self):
+        self._in_transaction = True
+        self._db.cursor().execute("BEGIN")
+
+    @_async_op
+    def commit(self):
+        self._in_transaction = False
+        self._db.commit()
+
+    @_async_op
+    def rollback(self):
+        self._in_transaction = False
+        self._db.rollback()
 
     @_async_op
     def get_expire(self, key) -> int | None:
@@ -448,6 +468,7 @@ class SQLiteSession(SQLite):
         self._operation_queue: SimpleQueue[OperationPayload] = SimpleQueue()
         self._executor = Thread(target=self._run_executor, daemon=True)
         self._running = False
+        self._in_transaction = False
 
     async def connect(self) -> "SQLite":
         self._running = True
