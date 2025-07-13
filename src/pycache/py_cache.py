@@ -64,6 +64,9 @@ class Session:
 
     @asynccontextmanager
     async def with_transaction(self):
+        if not self._adapter.get_support_transactions():
+            raise NotImplementedError("This adapter does not support transactions")
+
         adapter: Adapter = self._adapter
         await adapter.begin()
         try:
@@ -108,3 +111,10 @@ class PyCache:
 
     def get_all_keys_with_expiry(self) -> list[tuple[str, str]]:
         return self._adapter.get_all_keys_with_expiry()
+
+    def get_support_transactions(self) -> bool:
+        """Check if the adapter supports transactions."""
+        return self._adapter.get_support_transactions()
+
+    def delete_expired_attributes(self):
+        return self._adapter.delete_expired_attributes()

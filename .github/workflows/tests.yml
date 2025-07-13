@@ -28,4 +28,4 @@ jobs:
 
       - name: Run tests with pytest
         run: |
-          python -m pytest src/tests/
+          python -m pytest src/tests/ -s --log-cli-level=INFO

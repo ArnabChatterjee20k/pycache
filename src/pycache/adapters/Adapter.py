@@ -82,6 +82,10 @@ class Adapter(ABC):
     def rollback(self):
         pass
 
+    def get_support_transactions(self) -> bool:
+        """Return True by default. Override in adapters that don't support transactions."""
+        return True
+
     def to_bytes(self, data):
         return pickle.dumps(data)
 
