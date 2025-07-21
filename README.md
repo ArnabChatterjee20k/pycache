@@ -17,7 +17,7 @@ A powerful Python caching library with TTL support, multiple backend storage opt
 
 ## Installation
 
-> pip install -e https://github.com/ArnabChatterjee20k/pycache
+> pip install git+https://github.com/ArnabChatterjee20k/pycache
 
 ## Quick Start
 
