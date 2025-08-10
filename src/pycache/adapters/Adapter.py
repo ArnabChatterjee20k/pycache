@@ -35,7 +35,7 @@ class Adapter(ABC):
         pass
 
     @abstractmethod
-    def batch_get(self, keys: list[str]) -> list:
+    def batch_get(self, keys: list[str], datatype: Datatype = None) -> list:
         pass
 
     @abstractmethod

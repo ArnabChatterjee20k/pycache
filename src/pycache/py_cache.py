@@ -36,11 +36,7 @@ class Session:
 
         raise TypeError("Value must be a dictionary of string → Datatype")
 
-    async def batch_get(self, keys: list[str]) -> dict:
-        if not isinstance(keys, list):
-            raise TypeError("keys must be a list of strings")
-
-    async def batch_get(self, keys, datatype: str = None) -> dict:
+    async def batch_get(self, keys, datatype: Datatype = None) -> dict:
         if isinstance(keys, list):
             # List of strings - uniform datatype
             return await self._adapter.batch_get(keys, datatype)

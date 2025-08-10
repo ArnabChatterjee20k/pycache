@@ -59,14 +59,15 @@ class Redis(Adapter):
         key_path = self.get_key_path(key)
         return await self._set_datatype(key_path, value)
 
-    async def batch_get(self, keys, datatype: str = None):
+    async def batch_get(self, keys, datatype: Datatype = None):
         if isinstance(keys, dict):
-            # Keys is a dictionary {key: datatype_name}
+            # Keys is a dictionary {key: datatype}
             pipe = self._client.pipeline()
             key_order = []
             
-            for original_key, datatype_name in keys.items():
+            for original_key, datatype in keys.items():
                 key_path = self.get_key_path(original_key)
+                datatype_name = datatype.get_name() if hasattr(datatype, 'get_name') else str(datatype)
                 key_order.append((original_key, key_path, datatype_name))
                 await self._get_datatype(key_path, datatype_name, pipe)  # Still need await, but returns None immediately
             
@@ -82,12 +83,15 @@ class Redis(Adapter):
         elif isinstance(keys, list):
             # Keys is a list of strings
             if datatype is None:
-                datatype = String.get_name()  # Default to string if not specified
+                datatype = String  # Default to String class if not specified
+            
+            # Get the datatype name from the Datatype instance
+            datatype_name = datatype.get_name()
             
             if len(keys) == 1:
                 # Single key - no need for pipeline
                 key_path = self.get_key_path(keys[0])
-                value = await self._get_datatype(key_path, datatype)
+                value = await self._get_datatype(key_path, datatype_name)
                 return {keys[0]: value}
             else:
                 # Multiple keys - use pipeline
@@ -97,14 +101,14 @@ class Redis(Adapter):
                 for original_key in keys:
                     key_path = self.get_key_path(original_key)
                     key_paths.append((original_key, key_path))
-                    await self._get_datatype(key_path, datatype, pipe)  # Still need await, but returns None immediately
+                    await self._get_datatype(key_path, datatype_name, pipe)  # Still need await, but returns None immediately
                 
                 raw_values = await pipe.execute()
                 
                 # Process results and map back to original keys
                 final_result = {}
                 for i, (original_key, key_path) in enumerate(key_paths):
-                    final_result[original_key] = self._process_datatype_value(raw_values[i], datatype)
+                    final_result[original_key] = self._process_datatype_value(raw_values[i], datatype_name)
                 
                 return final_result
         else:

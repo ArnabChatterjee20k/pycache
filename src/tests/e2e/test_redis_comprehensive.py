@@ -207,7 +207,7 @@ class TestRedisComprehensive:
             await session.batch_set(string_data)
             
             # Batch get strings with datatype specified
-            results = await session.batch_get(["str1", "str2", "str3"], datatype="string")
+            results = await session.batch_get(["str1", "str2", "str3"], datatype=String)
             assert results["str1"] == "value1"
             assert results["str2"] == "value2"
             assert results["str3"] == "value3"
@@ -227,11 +227,11 @@ class TestRedisComprehensive:
             
             # Batch get with mixed datatypes using Redis adapter's new functionality
             datatype_map = {
-                "str_key": "string",
-                "num_key": "numeric", 
-                "list_key": "list",
-                "set_key": "set",
-                "map_key": "map"
+                "str_key": String,
+                "num_key": Numeric, 
+                "list_key": List,
+                "set_key": Set,
+                "map_key": Map
             }
             
             # Use the Redis adapter's batch_get with mixed datatypes
@@ -615,7 +615,7 @@ class TestRedisComprehensive:
             await session.set_expire("session:abc123", 3600)  # 1 hour session
             
             # 4. Batch operations
-            batch_keys = {"user:1":Map, "user:2":Map}
+            batch_keys = {"user:1":Map, "user:2":Map, "counter:page_views":Numeric}
             results = await session.batch_get(batch_keys)
             assert len(results) == 3
             
@@ -645,7 +645,7 @@ class TestRedisComprehensive:
         await self.redis_adapter.set("batch1", String("value1"))
         await self.redis_adapter.set("batch2", String("value2"))
         
-        results = await self.redis_adapter.batch_get(["batch1", "batch2"], "string")
+        results = await self.redis_adapter.batch_get(["batch1", "batch2"], String)
         assert results["batch1"] == "value1"
         assert results["batch2"] == "value2"
         
@@ -654,8 +654,8 @@ class TestRedisComprehensive:
         await self.redis_adapter.set("mix_num", Numeric(42))
         
         mixed_results = await self.redis_adapter.batch_get({
-            "mix_str": "string",
-            "mix_num": "numeric"
+            "mix_str": String,
+            "mix_num": Numeric
         })
         assert mixed_results["mix_str"] == "hello"
         assert mixed_results["mix_num"] == 42 

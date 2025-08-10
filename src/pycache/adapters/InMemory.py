@@ -79,7 +79,7 @@ class InMemory(Adapter):
                 }
             return 1
 
-    async def batch_get(self, keys: list[str],datatype: str = None) -> dict:
+    async def batch_get(self, keys: list[str], datatype: Datatype = None) -> dict:
         self._check_connected()
         result = {}
         locks = [self._get_lock(k) for k in keys]

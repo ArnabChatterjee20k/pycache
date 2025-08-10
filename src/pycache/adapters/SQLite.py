@@ -254,7 +254,7 @@ class SQLite(Adapter):
         return row[0] if row else None
 
     @_async_op
-    def batch_get(self, keys: list[str],datatype: str = None) -> list:
+    def batch_get(self, keys: list[str], datatype: Datatype = None) -> list:
         stmt = Composed(
             [
                 SQL("SELECT {key}, {value} FROM {table}").format(
