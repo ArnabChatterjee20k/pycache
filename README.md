@@ -27,7 +27,7 @@ A powerful Python caching library with TTL support, multiple backend storage opt
 import asyncio
 from src.pycache.py_cache import PyCache
 from src.pycache.adapters import InMemory, SQLite
-from src.pycache.datatypes import String, List, Map, Numeric, Set, Queue
+from src.pycache.datatypes import String, List, Map, Numeric, Set, Queue, Streams
 
 async def main():
     # Create cache with in-memory backend
@@ -331,6 +331,7 @@ asyncio.run(main())
 - `Map(value)`: Store dictionary values
 - `Set(value)`: Store set values
 - `Queue(value)`: Store deque values
+- `Streams(value)`: Store stream data (Redis streams support)
 
 ## Knowledge Dump
 
@@ -371,6 +372,14 @@ This design allows each session to have its own database connection and thread, 
 9. Sharding support for all adapters
 10. Cache eviction
 11. Using "TYPE" command of redis to know the types automatically(as an option at the adapter)
+
+## Documentation
+
+For detailed information about PyCache components, see our comprehensive guides:
+
+- **[Adapter Comparison](ADAPTER_COMPARISON.md)** - Detailed comparison of all storage backends (InMemory, SQLite, Redis) with feature matrices, performance characteristics, and use case recommendations.
+
+- **[Datatype Comparison](DATATYPE_COMPARISON.md)** - Complete guide to all PyCache datatypes (String, Numeric, List, Map, Set, Queue, Streams) with examples, validation rules, and Redis storage mappings.
 
 ## Contributing
 
