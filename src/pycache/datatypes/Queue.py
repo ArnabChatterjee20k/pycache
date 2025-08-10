@@ -13,3 +13,7 @@ class Queue(Datatype):
         if isinstance(self._value, deque):
             return self._value
         return deque(self._value)
+
+    @staticmethod
+    def get_name() -> str:
+        return "queue"

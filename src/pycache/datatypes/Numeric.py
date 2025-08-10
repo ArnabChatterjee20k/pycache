@@ -12,3 +12,7 @@ class Numeric(Datatype):
     @property
     def value(self) -> int | float:
         return self._value
+
+    @staticmethod
+    def get_name() -> str:
+        return "numeric"

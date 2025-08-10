@@ -11,3 +11,7 @@ class Map(Datatype):
         if isinstance(self._value, dict):
             return self._value
         return dict(self._value)
+
+    @staticmethod
+    def get_name() -> str:
+        return "map"

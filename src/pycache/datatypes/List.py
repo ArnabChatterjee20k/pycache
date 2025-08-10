@@ -12,3 +12,7 @@ class List(Datatype):
         if isinstance(self._value, list):
             return self._value
         return list(self._value)
+
+    @staticmethod
+    def get_name() -> str:
+        return "list"

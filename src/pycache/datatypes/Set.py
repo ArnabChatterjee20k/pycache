@@ -12,3 +12,7 @@ class Set(Datatype):
         if isinstance(self._value, set):
             return self._value
         return set(self._value)
+
+    @staticmethod
+    def get_name() -> str:
+        return "set"

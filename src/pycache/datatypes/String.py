@@ -12,3 +12,7 @@ class String(Datatype):
         if isinstance(self._value, str):
             return self._value
         return str(self._value)
+
+    @staticmethod
+    def get_name() -> str:
+        return "string"
