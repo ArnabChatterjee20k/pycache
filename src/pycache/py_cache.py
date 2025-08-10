@@ -44,12 +44,19 @@ class Session:
             # Dict mapping keys to datatypes - mixed datatypes
             return await self._adapter.batch_get(keys)
         else:
-            raise TypeError("keys must be either a list of strings or a dict mapping keys to datatype names")
+            raise TypeError(
+                "keys must be either a list of strings or a dict mapping keys to datatype names"
+            )
 
     async def get(self, key, expected_datatype: Datatype = None):
-        if not self._adapter.get_support_datatype_serializer() and expected_datatype is None:
-            raise ValueError("Adapter doesn't support datatype serialization. You must provide expected_datatype parameter.")
-        
+        if (
+            not self._adapter.get_support_datatype_serializer()
+            and expected_datatype is None
+        ):
+            raise ValueError(
+                "Adapter doesn't support datatype serialization. You must provide expected_datatype parameter."
+            )
+
         return await self._adapter.get(key, expected_datatype)
 
     async def delete(self, key) -> int:

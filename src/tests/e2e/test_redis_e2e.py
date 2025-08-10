@@ -30,7 +30,8 @@ class TestRedisE2E(BaseCacheTests):
     # Override tests that use get() without datatype to pass the expected datatype
     async def test_set_and_get_string(self):
         from src.pycache.datatypes import String
+
         async with self.cache.session() as cache:
             await cache.set("foo", String("bar"))
             result = await cache.get("foo", String(""))
-            assert self.extract_value(result) == "bar" 
+            assert self.extract_value(result) == "bar"
