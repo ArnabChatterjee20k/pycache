@@ -37,10 +37,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Wait for Redis to be ready
-        run: |
-          timeout 30s bash -c 'until redis-cli -h localhost -p 6379 ping; do sleep 1; done'
-
       - name: Run tests with pytest
         run: |
           python -m pytest src/tests/ -s --log-cli-level=INFO
