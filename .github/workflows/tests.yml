@@ -12,6 +12,17 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,6 +36,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
+
+      - name: Wait for Redis to be ready
+        run: |
+          timeout 30s bash -c 'until redis-cli -h localhost -p 6379 ping; do sleep 1; done'
 
       - name: Run tests with pytest
         run: |
