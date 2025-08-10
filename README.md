@@ -359,6 +359,19 @@ PyCacheSession(PyCache)
 
 This design allows each session to have its own database connection and thread, preventing shared state issues in concurrent environments.
 
+## Next Steps
+1. Instead of a row for list/queue/set -> use tables in case of sqlite
+2. Support pagination for list/queue/set
+3. Invalidating empty list/queue/set at the Datatype layer(which is getting done at the redis adapter set datatype method)
+4. Support for projection of data via datatype(we already have expected_datatype)
+5. Stream support for the other adapters
+6. Sorted set support for all adapters
+7. Vector support
+8. Mysql support
+9. Sharding support for all adapters
+10. Cache eviction
+11. Using "TYPE" command of redis to know the types automatically(as an option at the adapter)
+
 ## Contributing
 
 1. Fork the repository

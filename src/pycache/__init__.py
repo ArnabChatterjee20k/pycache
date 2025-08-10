@@ -18,6 +18,7 @@ from .decorators import cache, rate_limit, get_hash_key
 from .adapters.Adapter import Adapter
 from .adapters.InMemory import InMemory
 from .adapters.SQLite import SQLite
+from .adapters.Redis import Redis
 
 # Import datatypes
 from .datatypes.Datatype import Datatype
@@ -27,6 +28,7 @@ from .datatypes.List import List
 from .datatypes.Map import Map
 from .datatypes.Set import Set
 from .datatypes.Queue import Queue
+from .datatypes.Streams import Streams
 
 __version__ = "0.1.0"
 __all__ = [
@@ -51,6 +53,7 @@ __all__ = [
     "Adapter",
     "InMemory",
     "SQLite",
+    "Redis",
     
     # Datatypes
     "Datatype",
@@ -60,4 +63,5 @@ __all__ = [
     "Map", 
     "Set",
     "Queue",
+    "Streams",
 ]
