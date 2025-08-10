@@ -15,6 +15,11 @@ class Datatype(ABC):
         """for getting the python native version of the datatype"""
         pass
 
+    @staticmethod
+    def get_name() -> str:
+        """Return the name of the datatype"""
+        pass
+
     def validate(self, value):
         if isinstance(value, tuple(self._disallowed_classes)):
             disallowed = ", ".join(cls.__name__ for cls in self._disallowed_classes)

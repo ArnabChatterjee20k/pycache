@@ -5,5 +5,6 @@ from .Numeric import Numeric
 from .Queue import Queue
 from .Set import Set
 from .String import String
+from .Streams import Streams
 
-__all__ = ["Datatype", "List", "Map", "Numeric", "Queue", "Set", "String"]
+__all__ = ["Datatype", "List", "Map", "Numeric", "Queue", "Set", "String", "Streams"]
