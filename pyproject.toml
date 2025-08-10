@@ -24,7 +24,7 @@ classifiers = [
 ]
 requires-python = ">=3.8"
 dependencies = [
-    "asyncio",
+    "redis"
 ]
 
 [project.optional-dependencies]
