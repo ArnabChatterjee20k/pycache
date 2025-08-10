@@ -189,7 +189,7 @@ class SQLite(Adapter):
         #     print(row)
 
     @_async_op
-    def get(self, key: str) -> any:
+    def get(self, key: str, datatype: Datatype = None) -> any:
         # SQLite doesn't provide select for update to lock table, we need to lock the entire database
         # TODO: need to use distributed locks may be with a separate locks table
         stmt = Composed(
@@ -254,7 +254,7 @@ class SQLite(Adapter):
         return row[0] if row else None
 
     @_async_op
-    def batch_get(self, keys: list[str]) -> list:
+    def batch_get(self, keys: list[str],datatype: str = None) -> list:
         stmt = Composed(
             [
                 SQL("SELECT {key}, {value} FROM {table}").format(

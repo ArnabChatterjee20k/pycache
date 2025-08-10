@@ -19,7 +19,11 @@ class Session:
 
     async def set(self, key, value: Datatype | dict[str, Datatype]) -> int:
         if isinstance(value, Datatype):
-            return await self._adapter.set(key, value.value)
+            if self._adapter.get_support_datatype_serializer():
+                return await self._adapter.set(key, value.value)
+            else:
+                # Pass the full datatype object for adapters that don't support serialization
+                return await self._adapter.set(key, value)
 
         if isinstance(value, dict):
             return await self._adapter.batch_set(value)
@@ -36,10 +40,21 @@ class Session:
         if not isinstance(keys, list):
             raise TypeError("keys must be a list of strings")
 
-        return await self._adapter.batch_get(keys)
+    async def batch_get(self, keys, datatype: str = None) -> dict:
+        if isinstance(keys, list):
+            # List of strings - uniform datatype
+            return await self._adapter.batch_get(keys, datatype)
+        elif isinstance(keys, dict):
+            # Dict mapping keys to datatypes - mixed datatypes
+            return await self._adapter.batch_get(keys)
+        else:
+            raise TypeError("keys must be either a list of strings or a dict mapping keys to datatype names")
 
-    async def get(self, key):
-        return await self._adapter.get(key)
+    async def get(self, key, expected_datatype: Datatype = None):
+        if not self._adapter.get_support_datatype_serializer() and expected_datatype is None:
+            raise ValueError("Adapter doesn't support datatype serialization. You must provide expected_datatype parameter.")
+        
+        return await self._adapter.get(key, expected_datatype)
 
     async def delete(self, key) -> int:
         return await self._adapter.delete(key)

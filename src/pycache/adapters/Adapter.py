@@ -27,7 +27,7 @@ class Adapter(ABC):
         pass
 
     @abstractmethod
-    def get(self, key: str) -> any:
+    def get(self, key: str, datatype: Datatype = None) -> any:
         pass
 
     @abstractmethod
@@ -85,6 +85,14 @@ class Adapter(ABC):
     def get_support_transactions(self) -> bool:
         """Return True by default. Override in adapters that don't support transactions."""
         return True
+
+    def get_support_datatype_serializer(self) -> bool:
+        """Return True by default. Override in adapters that don't support datatype serialization."""
+        return True
+
+    def get_support_for_streams(self) -> bool:
+        """Return False by default. Override in adapters that support stream operations."""
+        return False
 
     def to_bytes(self, data):
         return pickle.dumps(data)

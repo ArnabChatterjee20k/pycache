@@ -48,7 +48,7 @@ class InMemory(Adapter):
     async def create_index(self):
         pass
 
-    async def get(self, key: str) -> Any:
+    async def get(self, key: str, datatype: Datatype = None) -> Any:
         self._check_connected()
         lock = self._get_lock(key)
         with lock:
@@ -79,7 +79,7 @@ class InMemory(Adapter):
                 }
             return 1
 
-    async def batch_get(self, keys: list[str]) -> dict:
+    async def batch_get(self, keys: list[str],datatype: str = None) -> dict:
         self._check_connected()
         result = {}
         locks = [self._get_lock(k) for k in keys]
