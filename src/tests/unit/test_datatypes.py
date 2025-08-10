@@ -1,6 +1,6 @@
 import pytest
 from collections import deque
-from src.pycache.datatypes import String, List, Map, Numeric, Set, Queue
+from src.pycache.datatypes import String, List, Map, Numeric, Set, Queue, Streams
 
 
 class TestString:
@@ -233,6 +233,74 @@ class TestQueue:
         assert list(queue_dt.value) == [0, 1, 2]
 
 
+class TestStreams:
+    """Unit tests for Streams datatype"""
+
+    def test_valid_list(self):
+        """Test creating Streams with valid list value"""
+        streams_dt = Streams([1, 2, 3])
+        assert streams_dt.value == [1, 2, 3]
+
+    def test_valid_tuple(self):
+        """Test creating Streams with valid tuple value"""
+        streams_dt = Streams((1, 2, 3))
+        assert streams_dt.value == [1, 2, 3]
+
+    def test_valid_dict(self):
+        """Test creating Streams with valid dict value"""
+        streams_dt = Streams({"a": 1, "b": 2})
+        assert streams_dt.value == [("a", 1), ("b", 2)]
+
+    def test_empty_iterables(self):
+        """Test Streams with empty iterables"""
+        empty_list = Streams([])
+        empty_tuple = Streams(())
+        empty_dict = Streams({})
+        assert empty_list.value == []
+        assert empty_tuple.value == []
+        assert empty_dict.value == []
+
+    def test_streams_with_mixed_types(self):
+        """Test Streams with mixed data types"""
+        mixed_data = [1, "string", True, None, {"key": "value"}]
+        streams_dt = Streams(mixed_data)
+        assert streams_dt.value == mixed_data
+
+    def test_streams_from_string(self):
+        """Test Streams from string (iterable)"""
+        streams_dt = Streams("hello")
+        assert streams_dt.value == ["h", "e", "l", "l", "o"]
+
+    def test_streams_from_range(self):
+        """Test Streams from range object"""
+        streams_dt = Streams(range(3))
+        assert streams_dt.value == [0, 1, 2]
+
+    def test_streams_from_set(self):
+        """Test Streams from set (order may vary)"""
+        streams_dt = Streams({1, 2, 3})
+        # Order may vary with sets
+        assert set(streams_dt.value) == {1, 2, 3}
+
+    def test_streams_dict_items_order(self):
+        """Test Streams from dict maintains key-value pairs"""
+        test_dict = {"x": 10, "y": 20, "z": 30}
+        streams_dt = Streams(test_dict)
+        # Convert back to dict to check key-value pairs
+        result_dict = dict(streams_dt.value)
+        assert result_dict == test_dict
+
+    def test_streams_nested_structure(self):
+        """Test Streams with nested data structures"""
+        nested_data = [{"a": [1, 2]}, {"b": {"c": 3}}]
+        streams_dt = Streams(nested_data)
+        assert streams_dt.value == nested_data
+
+    def test_streams_get_name(self):
+        """Test Streams get_name static method"""
+        assert Streams.get_name() == "streams"
+
+
 class TestDatatypeValidation:
     """Unit tests for datatype validation"""
 
@@ -274,6 +342,14 @@ class TestDatatypeValidation:
         ):
             Queue(123)
 
+    def test_streams_invalid_type(self):
+        """Test Streams with invalid type raises TypeError"""
+        with pytest.raises(
+            TypeError,
+            match="Invalid type: expected one of \\(Iterable, list, tuple, dict\\), but got",
+        ):
+            Streams(123)
+
 
 class TestDatatypeEdgeCases:
     """Unit tests for datatype edge cases"""
@@ -307,6 +383,11 @@ class TestDatatypeEdgeCases:
         """Test Queue with None value should fail"""
         with pytest.raises(TypeError):
             Queue(None)
+
+    def test_streams_none_value(self):
+        """Test Streams with None value should fail"""
+        with pytest.raises(TypeError):
+            Streams(None)
 
     def test_string_boolean_conversion(self):
         """Test String with boolean values"""
