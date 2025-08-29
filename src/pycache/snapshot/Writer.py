@@ -29,6 +29,7 @@ class Writer:
             return 1
 
         elif length < LengthSizeMarkers.FORTEEN_BIT_ENCODING.value:
+            # bytes([64 | ((length>>8)) , length & 0xFF])
             # right shift to get 8bits
             first_byte = length >> 8
             # adding prefix(01) to the byte
@@ -42,7 +43,8 @@ class Writer:
             return 2
             
         else:
-            self.buffer.write([0x80,struct.pack("<I",length)])
+            self.buffer.write(bytes([0x80]))
+            self.buffer.write(struct.pack("<I",length))
             return 5
 
     def _write_key_value(self,key,value):
@@ -52,10 +54,11 @@ class Writer:
         key_length = len(key)
         self._write_length(key_length)
         self._write_string(key.encode())
-        self._write_string(value.encode())
+        self._write_string(str(value).encode())
 
     
     def _write_encoding(self,encoding:Encoder):
+        # all encoding will have a prefix of 11
         byte = 3<<6 | encoding.value
         self.buffer.write(bytes([byte]))
 
@@ -64,7 +67,6 @@ class Writer:
         # compression and integer encoding
         is_numeric = value.decode().isnumeric()
         original_length = len(value)
-        
         # 1byte encoding + rest for the bytes
         if original_length<=11 and is_numeric:
             value = int(value.decode('ascii'))
@@ -85,14 +87,14 @@ class Writer:
         compressed_data = compress(value)
         compressed_length = len(compressed_data)
         if compressed_length < original_length:
+            self._write_encoding(Encoder.COMPRESSED)
             return sum(
-                        (self._write_encoding(Encoder.COMPRESSED), 
+                        (
                         self._write_length(compressed_length),
-                        self._write_length(original_length),
                         self.buffer.write(compressed_data))
                     )
 
-        # store directly(no compression marker)
+        # # store directly(no compression marker)
         return sum(
                     (self._write_length(original_length),
                     self.buffer.write(value))
