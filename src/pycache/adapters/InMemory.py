@@ -1,10 +1,9 @@
-import asyncio
 import threading
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 from .Adapter import Adapter
 from ..datatypes.Datatype import Datatype
-
+from ..snapshot.Snapshot import SnapshotManager
 
 class InMemory(Adapter):
     _shared_db: Dict[str, Any] = {}
@@ -15,9 +14,12 @@ class InMemory(Adapter):
     def __init__(self, connection_uri="", *args):
         super().__init__(connection_uri=connection_uri, *args)
         self._connected = False
+        self.snapshot = SnapshotManager()
 
     async def connect(self) -> "InMemory":
         self._connected = True
+        self._shared_db = self.snapshot.load_snapshot()
+        self.snapshot.start(self._shared_db)
         return self
 
     async def __aenter__(self):
@@ -27,6 +29,7 @@ class InMemory(Adapter):
         await self.close()
 
     async def close(self):
+        self.snapshot.stop()
         self._connected = False
 
     def _check_connected(self):
@@ -77,6 +80,7 @@ class InMemory(Adapter):
                     "expires_at": None,
                     "ttl": None,
                 }
+            self.snapshot.record_change(1)
             return 1
 
     async def batch_get(self, keys: list[str], datatype: Datatype = None) -> dict:
@@ -127,6 +131,7 @@ class InMemory(Adapter):
         finally:
             for lock in reversed(locks):
                 lock.release()
+        self.snapshot.record_change(count)
         return count
 
     async def delete(self, key: str) -> int:
@@ -135,6 +140,7 @@ class InMemory(Adapter):
         with lock:
             if key in self._shared_db:
                 del self._shared_db[key]
+                self.snapshot.record_change(1)
                 return 1
             return 0
 
@@ -168,6 +174,7 @@ class InMemory(Adapter):
                 now = datetime.now(timezone.utc)
                 entry["expires_at"] = now + timedelta(seconds=ttl)
                 entry["ttl"] = ttl
+                self.snapshot.record_change(1)
                 return 1
             return 0
 
