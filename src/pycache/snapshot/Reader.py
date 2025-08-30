@@ -3,13 +3,14 @@ import os
 import struct
 from pathlib import Path
 from io import BytesIO
+from typing import BinaryIO
 from collections import deque
 from ..compressor import decompress
 from .Identifier import DataTypesIdentifier,TYPE_TO_DataTypeIdentifer,DataTypeIdentifer_TO_TYPE, Encoder, LengthSizeMarkers
 
 class Reader:
-    def __init__(self,path:str):
-        self.buffer = open("arnab.txt","rb")
+    def __init__(self,source_buffer:BinaryIO):
+        self.buffer = source_buffer
         self.data = {}
 
     def load(self):
@@ -24,17 +25,17 @@ class Reader:
         length = self.buffer.read(1)
         marker = length[0]
         
-        if marker < LengthSizeMarkers.SIX_BIT_ENCODING.value:
+        if marker <= LengthSizeMarkers.SIX_BIT_ENCODING.value:
             return marker
 
         first_byte = marker & 0x3F
-        if marker < LengthSizeMarkers.FORTEEN_BIT_ENCODING.value:
+        if marker <= LengthSizeMarkers.FORTEEN_BIT_ENCODING.value:
             # (buffer[0] & 0x3F) << 8 | buffer[1]
             second_byte = self.buffer.read(1)[0]
             # 0x3F gives the last 6bits excluding the marker
             return (first_byte << 8) | second_byte
         
-        if marker == LengthSizeMarkers.THIRTY_TWO_BIT_ENCODING:
+        if marker == LengthSizeMarkers.THIRTY_TWO_BIT_ENCODING.value:
             return struct.unpack('<I',self.buffer.read(4))[0]
         
         raise ValueError(f'Unknown encoding marker: {marker}')

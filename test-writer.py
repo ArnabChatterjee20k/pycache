@@ -1,3 +1,12 @@
 from src.pycache.snapshot.Writer import Writer
-
-Writer({"a":"12","b":"12"},"./").save()
+from src.pycache.snapshot.Reader import Reader
+from io import BytesIO
+data = {}
+for i in range(10):
+    capital_letter = 65 + i
+    data[str(capital_letter+100)] = capital_letter
+file_buffer = BytesIO()
+Writer(data,file_buffer).save()
+print(data)
+file_buffer.seek(0)
+print(Reader(file_buffer).load())

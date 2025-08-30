@@ -4,15 +4,14 @@ import struct
 from pathlib import Path
 from io import BytesIO
 from collections import deque
+from typing import BinaryIO
 from ..compressor import compress
-from .Identifier import DataTypesIdentifier,TYPE_TO_DataTypeIdentifer,DataTypeIdentifer_TO_TYPE, Encoder, LengthSizeMarkers
+from .Identifier import TYPE_TO_DataTypeIdentifer, Encoder, LengthSizeMarkers
 
 class Writer:
-    def __init__(self,source:dict,path:str):
+    def __init__(self,source:dict, buffer:BinaryIO):
         self.source = source
-        self.path = Path(path)
-        # self.buffer = BytesIO()
-        self.buffer = open("arnab.txt","wb")
+        self.buffer = buffer
 
     def save(self):
         # key count
@@ -24,11 +23,11 @@ class Writer:
         """
             returns bytes of data written
         """
-        if length < LengthSizeMarkers.SIX_BIT_ENCODING.value:
+        if length <= LengthSizeMarkers.SIX_BIT_ENCODING.value:
             self.buffer.write(bytes([length]))
             return 1
 
-        elif length < LengthSizeMarkers.FORTEEN_BIT_ENCODING.value:
+        elif length <= LengthSizeMarkers.FORTEEN_BIT_ENCODING.value:
             # bytes([64 | ((length>>8)) , length & 0xFF])
             # right shift to get 8bits
             first_byte = length >> 8
@@ -43,7 +42,7 @@ class Writer:
             return 2
             
         else:
-            self.buffer.write(bytes([0x80]))
+            self.buffer.write(bytes([LengthSizeMarkers.THIRTY_TWO_BIT_ENCODING.value]))
             self.buffer.write(struct.pack("<I",length))
             return 5
 

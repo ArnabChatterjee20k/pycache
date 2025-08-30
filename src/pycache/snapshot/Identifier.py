@@ -68,13 +68,13 @@ class Encoder(Enum):
     INT32 = 2
     COMPRESSED = 3
 
-# Variable length encoding for length extraction
+# Variable length encoding for length extraction(Limit markers)
 """
 00 for 6-bit (length in lower 6 bits). => 0x00 to 0x3F | 00 is the prefix
 01 for 14-bit (length split across two bytes). => 0x40 to 0x7F | prefix added => 01
 10 for 32-bit (length in next four bytes). => 0x80(prefix) and actually 5 bytes present. First byte represents its 32 bit and next 4bytes represents the value
 """
 class LengthSizeMarkers(Enum):
-    SIX_BIT_ENCODING = 64
-    FORTEEN_BIT_ENCODING = 128
-    THIRTY_TWO_BIT_ENCODING = 0x80
+    SIX_BIT_ENCODING = 63
+    FORTEEN_BIT_ENCODING = 127
+    THIRTY_TWO_BIT_ENCODING = 0x80 # 128
