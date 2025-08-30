@@ -1,4 +1,5 @@
 # core
+write_value => basically writes value_length + value bytes
 write_length(count) -> variable length encoder
 write_value(data) ->
     if int:

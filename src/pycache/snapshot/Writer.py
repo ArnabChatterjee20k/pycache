@@ -55,20 +55,25 @@ class Writer:
     def _write_key_value(self, key, value):
         object_type = TYPE_TO_DataTypeIdentifer[type(value)]
         self.buffer.write(bytes([object_type.value]))
-        self._write_value(key)
+        if key != None:
+
+            self._write_value(key)
         if object_type in SequenceTypes:
             # writing length marking
             self._write_length(len(value))
+
             if object_type == DataTypesIdentifier.MAP:
                 # writing length marking
+
                 for k, v in value.items():
                     self._write_key_value(k, v)
             else:
                 for entry in value:
-                    # TODO: nested sequences???
-                    entry_type = TYPE_TO_DataTypeIdentifer[type(entry)]
-                    self.buffer.write(bytes([entry_type.value]))
-                    self._write_value(entry)
+                    # recursive -> entry type write done in the top
+                    # entry_type = TYPE_TO_DataTypeIdentifer[type(entry)]
+                    # self.buffer.write(bytes([entry_type.value]))
+
+                    self._write_key_value(None, entry)
 
         else:
             self._write_value(value)

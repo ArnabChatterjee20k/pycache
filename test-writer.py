@@ -3,11 +3,15 @@ from src.pycache.snapshot.Reader import Reader
 from io import BytesIO
 
 data = {}
-for i in range(10):
+for i in range(1):
     capital_letter = 65 + i
     # data[str(capital_letter + 100)] = [capital_letter, capital_letter]
-    # data[str(capital_letter + 100)] = [1,2]
-    data[str(capital_letter + 100)] = {"a": "1212", "b": 121}
+    # data["a"] = [{"a":1},2]
+    data[str(capital_letter + 100)] = [
+        {"a": {"a": {"b": "1212"}}, "b": 121},
+        set([1, 2, 3, 4]),
+        [1212, [2, 24]],
+    ]
     # data[chr(capital_letter)] = capital_letter
     # data[str(capital_letter+100)] = capital_letter
 file_buffer = BytesIO()

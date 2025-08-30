@@ -24,7 +24,7 @@ class Reader:
     def load(self):
         keys = self._read_length()
         for _ in range(keys):
-            key, value = self._read_key_value()
+            key, value = self._read_key_value(expect_key=True)
             self.data[key] = value
         return self.data
 
@@ -57,7 +57,7 @@ class Reader:
         self.buffer.seek(-1, 1)
         return None
 
-    def _read_value(self, key_length=None):
+    def _read_value(self):
         encoding = self._read_encoding()
 
         if encoding == Encoder.INT8:
@@ -73,34 +73,35 @@ class Reader:
             comp_len = self._read_length()
             data = self.buffer.read(comp_len)
             return decompress(data).decode()
-
         else:
             original_length = self._read_length()
-            return self.buffer.read(original_length).decode("utf-8")
+            value = self.buffer.read(original_length).decode("utf-8")
+            return value
 
-    def _read_key_value(self):
+    def _read_key_value(self, expect_key=True):
         object_type = self.buffer.read(1)[0]
         value_datatype = DataTypeIdentifer_TO_TYPE[DataTypesIdentifier(object_type)]
-        key = self._read_value()
+        key = self._read_value() if expect_key else None
         value = None
         if TYPE_TO_DataTypeIdentifer[value_datatype] in SequenceTypes:
             size = self._read_length()
             if TYPE_TO_DataTypeIdentifer[value_datatype] == DataTypesIdentifier.MAP:
                 current_map = {}
                 for _ in range(size):
-                    k, v = self._read_key_value()
+                    k, v = self._read_key_value(expect_key=True)
                     current_map[k] = v
                 value = current_map
             else:
                 sequences = []
                 for _ in range(size):
-                    entry_type_byte = self.buffer.read(1)[0]
-                    entry_type = DataTypeIdentifer_TO_TYPE[
-                        DataTypesIdentifier(entry_type_byte)
-                    ]
-                    entry = self._read_value()
-                    sequences.append(entry_type(entry))
-                value = value_datatype(sequences)  # Construct the proper sequence type
+                    # recursive -> the entry type check is getting done on the top
+                    # entry_type_byte = self.buffer.read(1)[0]
+                    # entry_type = DataTypeIdentifer_TO_TYPE[
+                    #     DataTypesIdentifier(entry_type_byte)
+                    # ]
+                    _, entry = self._read_key_value(expect_key=False)
+                    sequences.append(entry)
+                value = value_datatype(sequences)
         else:
             value = value_datatype(self._read_value())
 
