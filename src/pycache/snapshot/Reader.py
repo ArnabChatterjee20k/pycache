@@ -82,18 +82,25 @@ class Reader:
         object_type = self.buffer.read(1)[0]
         value_datatype = DataTypeIdentifer_TO_TYPE[DataTypesIdentifier(object_type)]
         key = self._read_value()
-
+        value = None
         if TYPE_TO_DataTypeIdentifer[value_datatype] in SequenceTypes:
-            sequences = []
             size = self._read_length()
-            for _ in range(size):
-                entry_type_byte = self.buffer.read(1)[0]
-                entry_type = DataTypeIdentifer_TO_TYPE[
-                    DataTypesIdentifier(entry_type_byte)
-                ]
-                entry = self._read_value()
-                sequences.append(entry_type(entry))
-            value = value_datatype(sequences)  # Construct the proper sequence type
+            if TYPE_TO_DataTypeIdentifer[value_datatype] == DataTypesIdentifier.MAP:
+                current_map = {}
+                for _ in range(size):
+                    k, v = self._read_key_value()
+                    current_map[k] = v
+                value = current_map
+            else:
+                sequences = []
+                for _ in range(size):
+                    entry_type_byte = self.buffer.read(1)[0]
+                    entry_type = DataTypeIdentifer_TO_TYPE[
+                        DataTypesIdentifier(entry_type_byte)
+                    ]
+                    entry = self._read_value()
+                    sequences.append(entry_type(entry))
+                value = value_datatype(sequences)  # Construct the proper sequence type
         else:
             value = value_datatype(self._read_value())
 
