@@ -32,4 +32,6 @@ value data type -> list/sequences
 else:
     write_value(entry for entry in value)
 
-CRC checksum for verification and integrity
+# CRC checksum for verification and integrity
+writing -> during every write to buffer -> update checksum with the current written data
+reading -. after every read update checksum -> update checksum with the current read data
