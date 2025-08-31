@@ -23,6 +23,7 @@ class Writer:
         self._write_length(len(self.source))
         for key, value in self.source.items():
             self._write_key_value(key, value)
+        self.buffer.write(bytes([Encoder.EOF.value]))
 
     def _write_length(self, length):
         """
@@ -86,7 +87,7 @@ class Writer:
         # datetime -> iso string
         if isinstance(value, datetime):
             value = value.isoformat()
-        
+
         # both numeric and strings will be handling
         # compression and integer encoding
         value = str(value)

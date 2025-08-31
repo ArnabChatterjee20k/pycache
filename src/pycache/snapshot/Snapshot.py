@@ -7,6 +7,7 @@ from .Writer import Writer
 from .Reader import Reader
 import multiprocessing
 
+
 @dataclass
 class SnapshotConfig:
     dir: str = "./snapshot"
@@ -22,16 +23,16 @@ default_config = SnapshotConfig(min_changes=100, interval_hours=1)
 class SnapshotManager:
     _datetime_format = "%Y-%m-%d_%H-%M-%S"
 
-    def __init__(self,  config: SnapshotConfig = default_config):
+    def __init__(self, config: SnapshotConfig = default_config):
         self._config = config
         self._path: Path = None
         self._last_snapshot_time: datetime = datetime.now()
-        self._changes = multiprocessing.Value('i',0)
+        self._changes = multiprocessing.Value("i", 0)
         self._trigger = multiprocessing.Event()
         self._worker = None
         self._init_snapshot_dir()
 
-    def record_change(self,value=1):
+    def record_change(self, value=1):
         self._changes.value += value
         if self._changes.value >= self._config.min_changes:
             self._trigger.set()
@@ -44,7 +45,7 @@ class SnapshotManager:
             raise TypeError("The path config needs to be a directory")
         self._path = path
 
-    def force_snapshot(self,source:dict):
+    def force_snapshot(self, source: dict):
         now = datetime.now()
         path = self._path / now.strftime(self._datetime_format)
 
@@ -54,8 +55,8 @@ class SnapshotManager:
             f.flush()
             os.fsync(f.fileno())
 
-        self._changes = 0
-        self._last_snapshot_time = now
+        with self._changes.get_lock():
+            self._changes.value = 0
 
         # pruning old snapshot
         self.prune_old_snapshot()
@@ -90,7 +91,7 @@ class SnapshotManager:
             for old_file in snapshots[self._config.max_snapshots :]:
                 old_file.unlink(missing_ok=True)
 
-    def _run(self,source:dict):
+    def _run(self, source: dict):
         interval = timedelta(hours=self._config.interval_hours)
         print(interval)
         while True:
@@ -113,14 +114,20 @@ class SnapshotManager:
             elif time_passed >= interval and self._changes.value > 0:
                 self.force_snapshot(source)
 
-    def start(self,source:dict):
+    def start(self, source: dict):
         # starting the copy on write functionality(not for windows)
         self.source = source
-        self._worker = multiprocessing.Process(target=self._run,args=(source,),daemon=True)
+        self._worker = multiprocessing.Process(
+            target=self._run, args=(source,), daemon=True
+        )
         self._worker.start()
-    
+
     def stop(self):
         self.force_snapshot(self.source)
         if self._worker:
             self._worker.terminate()
             self._worker.join()
+
+    def is_processing(self) -> bool:
+        """Check if the snapshot process is currently running"""
+        return self._worker is not None and self._worker.is_alive()

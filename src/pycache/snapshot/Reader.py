@@ -1,4 +1,5 @@
 import struct
+import os
 from pathlib import Path
 from io import BytesIO
 from typing import BinaryIO
@@ -82,7 +83,14 @@ class Reader:
             return value
 
     def _read_key_value(self, expect_key=True):
-        object_type = self.buffer.read(1)[0]
+        current_starting_bytes = self.buffer.read(1)
+        if not current_starting_bytes:
+            return None
+        # Check for EOF marker (0x00)
+        if current_starting_bytes[0] == 0:
+            return None
+        object_type = current_starting_bytes[0]
+
         value_datatype = DataTypeIdentifer_TO_TYPE[DataTypesIdentifier(object_type)]
         key = self._read_value() if expect_key else None
         value = None
@@ -112,7 +120,13 @@ class Reader:
                 # iso string -> datetime
                 value = datetime.fromisoformat(raw_value)
             else:
-                value = value_datatype(raw_value)
+                if (
+                    TYPE_TO_DataTypeIdentifer[value_datatype]
+                    == DataTypesIdentifier.NONE
+                ):
+                    value = None
+                else:
+                    value = value_datatype(raw_value)
 
         # keys are always string format
         return str(key), value

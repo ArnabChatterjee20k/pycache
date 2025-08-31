@@ -77,11 +77,11 @@ SequenceTypes = (
 
 
 class Encoder(Enum):
-    EXPIRETIME = 253
     INT8 = 0
     INT16 = 1
     INT32 = 2
     COMPRESSED = 3
+    EOF = 0x00
 
 
 # Variable length encoding for length extraction(Limit markers)

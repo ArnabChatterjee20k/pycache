@@ -101,13 +101,15 @@ class PyCache:
 
     @asynccontextmanager
     async def session(self):
+        adapter = None
         try:
             adapter = await self._adapter.connect()
             await adapter.create()
             await adapter.create_index()
             yield Session(adapter)
         finally:
-            await adapter.close()
+            if adapter:
+                await adapter.close()
 
     async def start_ttl_deletion(self, delete_interval=0.5):
         if delete_interval <= 0:

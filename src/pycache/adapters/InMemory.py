@@ -1,9 +1,10 @@
-import threading
+import threading, asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 from .Adapter import Adapter
 from ..datatypes.Datatype import Datatype
 from ..snapshot.Snapshot import SnapshotManager
+
 
 class InMemory(Adapter):
     _shared_db: Dict[str, Any] = {}
@@ -29,7 +30,44 @@ class InMemory(Adapter):
         await self.close()
 
     async def close(self):
-        self.snapshot.stop()
+        # Check if snapshot process is currently running
+        if self.snapshot.is_processing():
+            # Wait for snapshot process to complete or timeout after a reasonable time
+            import time
+
+            max_wait_time = 5  # Reduced wait time to avoid hanging
+            wait_interval = 0.1  # Check every 100ms
+
+            start_time = time.time()
+            while (
+                self.snapshot.is_processing()
+                and (time.time() - start_time) < max_wait_time
+            ):
+                time.sleep(wait_interval)
+
+            # If worker is still alive after timeout, force terminate
+            if self.snapshot.is_processing():
+                print("Warning: Snapshot process taking too long, forcing termination")
+                try:
+                    # Stop the worker gracefully first
+                    self.snapshot._worker.terminate()
+                    self.snapshot._worker.join(timeout=1)
+
+                    # If still alive, force kill
+                    if self.snapshot._worker.is_alive():
+                        print("Force killing snapshot worker...")
+                        self.snapshot._worker.kill()
+                        self.snapshot._worker.join(timeout=1)
+
+                except Exception as e:
+                    print(f"Error terminating snapshot worker: {e}")
+
+        # Always try to stop the snapshot manager
+        try:
+            self.snapshot.stop()
+        except Exception as e:
+            print(f"Error stopping snapshot manager: {e}")
+
         self._connected = False
 
     def _check_connected(self):
