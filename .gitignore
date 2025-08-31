@@ -175,3 +175,5 @@ Desktop.ini
 *.sqlite
 *.db
 test.py
+
+/snapshot
