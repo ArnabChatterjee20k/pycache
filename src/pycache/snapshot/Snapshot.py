@@ -145,8 +145,7 @@ class SnapshotManager:
             self._worker = None
 
     def stop(self):
-        if hasattr(self, "source") and self.source:
-            self.force_snapshot(self.source)
+        self.force_snapshot(self.source)
         if self._worker:
             self._worker.terminate()
             self._worker.join()
