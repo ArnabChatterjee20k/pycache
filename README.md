@@ -182,6 +182,135 @@ async def main():
 asyncio.run(main())
 ```
 
+## Snapshots (InMemory Backend)
+
+The InMemory adapter supports automatic snapshots for data persistence. Snapshots are automatically created based on configurable triggers and can be loaded to restore cache state.
+
+### Basic Snapshot Usage
+
+```python
+import asyncio
+from src.pycache.py_cache import PyCache
+from src.pycache.adapters import InMemory
+from src.pycache.snapshot import SnapshotConfig
+from src.pycache.datatypes import String, List, Map
+
+async def main():
+    # Create InMemory cache with snapshot enabled
+    cache = PyCache(InMemory(snapshot=True))
+    
+    async with cache.session() as session:
+        # Store some data
+        await session.set("user:1", String("Alice"))
+        await session.set("user:2", String("Bob"))
+        await session.set("scores", List([100, 95, 87]))
+        await session.set("config", Map({"theme": "dark", "lang": "en"}))
+        
+        # Data is automatically persisted through snapshots
+        print("Data stored and snapshotted")
+
+asyncio.run(main())
+```
+
+### Custom Snapshot Configuration
+
+```python
+from src.pycache.snapshot import SnapshotConfig
+
+# Create custom snapshot configuration
+snapshot_config = SnapshotConfig(
+    dir="./my_snapshots",        # Custom snapshot directory
+    min_changes=50,              # Create snapshot after 50 changes
+    interval_hours=2,            # Or after 2 hours (whichever comes first)
+    auto=True,                   # Enable automatic snapshots
+    max_snapshots=10             # Keep last 10 snapshots
+)
+
+# Create cache with custom snapshot config
+cache = PyCache(InMemory(snapshot_config=snapshot_config))
+
+async with cache.session() as session:
+    # Your cache operations here
+    # Snapshots will be created automatically based on your config
+    pass
+```
+
+### Manual Snapshot Control
+
+```python
+async def main():
+    # Create cache without automatic snapshots
+    cache = PyCache(InMemory(snapshot=False))
+    
+    async with cache.session() as session:
+        # Store data
+        await session.set("key1", String("value1"))
+        await session.set("key2", String("value2"))
+        
+        # Enable snapshots with custom config
+        session._adapter.enable_snapshots(SnapshotConfig(
+            dir="./manual_snapshots",
+            min_changes=1,        # Snapshot after every change
+            interval_hours=0,     # No time-based triggers
+            auto=True,
+            max_snapshots=5
+        ))
+        
+        # Force a snapshot immediately
+        session._adapter._snapshot.force_snapshot(session._adapter._shared_db)
+        
+        # Check if snapshots are enabled
+        print(f"Snapshots enabled: {session._adapter.snapshots_enabled}")
+        
+        # Disable snapshots
+        session._adapter.disable_snapshots()
+
+asyncio.run(main())
+```
+
+### Loading Snapshots
+
+```python
+async def main():
+    cache = PyCache(InMemory(snapshot=True))
+    
+    async with cache.session() as session:
+        # Store initial data
+        await session.set("counter", Numeric(100))
+        await session.set("status", String("active"))
+        
+        # Simulate some time passing and changes
+        await asyncio.sleep(2)
+        
+        # Load the most recent snapshot
+        restored_data = session._adapter._snapshot.load_snapshot()
+        print(f"Restored {len(restored_data)} keys from snapshot")
+        
+        # Load snapshot from specific timestamp
+        # timestamp = "2024-01-15_14-30-25-123456"
+        # restored_data = session._adapter._snapshot.load_snapshot(timestamp)
+
+asyncio.run(main())
+```
+
+### Snapshot Configuration Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `dir` | `"./snapshot"` | Directory to store snapshot files |
+| `min_changes` | `100` | Minimum changes before creating snapshot |
+| `interval_hours` | `1` | Maximum hours between snapshots |
+| `auto` | `False` | Enable automatic snapshot creation |
+| `max_snapshots` | `4` | Maximum number of snapshots to keep |
+
+### Snapshot File Format
+
+Snapshots use a custom binary format optimized for Python data structures:
+- **Automatic compression** for large values
+- **Type-aware serialization** for all supported datatypes
+- **Timestamp-based naming** with collision handling
+- **Automatic cleanup** of old snapshots
+
 ## Batch Operations
 
 Efficiently handle multiple keys at once:

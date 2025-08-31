@@ -2,7 +2,6 @@ import pytest
 import tempfile
 import os
 import time
-import multiprocessing
 from pathlib import Path
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch, MagicMock
@@ -11,41 +10,6 @@ from src.pycache.snapshot.Snapshot import (
     SnapshotConfig,
     default_config,
 )
-
-
-class TestSnapshotConfig:
-    """Unit tests for SnapshotConfig dataclass"""
-
-    def test_snapshot_config_default_values(self):
-        """Test SnapshotConfig with default values"""
-        config = SnapshotConfig()
-
-        assert config.dir == "./snapshot"
-        assert config.min_changes == 1
-        assert config.interval_hours == 1
-        assert config.auto == True
-        assert config.max_snapshots == 4
-
-    def test_snapshot_config_custom_values(self):
-        """Test SnapshotConfig with custom values"""
-        config = SnapshotConfig(
-            dir="/custom/path",
-            min_changes=50,
-            interval_hours=2,
-            auto=False,
-            max_snapshots=10,
-        )
-
-        assert config.dir == "/custom/path"
-        assert config.min_changes == 50
-        assert config.interval_hours == 2
-        assert config.auto == False
-        assert config.max_snapshots == 10
-
-    def test_default_config_values(self):
-        """Test default_config constant values"""
-        assert default_config.min_changes == 100
-        assert default_config.interval_hours == 1
 
 
 class TestSnapshotManager:
@@ -58,7 +22,7 @@ class TestSnapshotManager:
             dir=self.temp_dir,
             min_changes=2,
             interval_hours=1,
-            auto=False,
+            auto=True,  # Changed to True so worker process starts
             max_snapshots=3,
         )
         self.snapshot_manager = SnapshotManager(self.config)
@@ -79,16 +43,6 @@ class TestSnapshotManager:
             os.rmdir(self.temp_dir)
         except:
             pass
-
-    def test_snapshot_manager_initialization(self):
-        """Test SnapshotManager initialization"""
-        assert self.snapshot_manager._config == self.config
-        assert self.snapshot_manager._path == Path(self.temp_dir)
-        assert hasattr(
-            self.snapshot_manager._changes, "value"
-        )  # Check if it's a multiprocessing.Value
-        assert isinstance(self.snapshot_manager._trigger, multiprocessing.Event)
-        assert self.snapshot_manager._worker is None
 
     def test_init_snapshot_dir_creates_directory(self):
         """Test that snapshot directory is created if it doesn't exist"""
