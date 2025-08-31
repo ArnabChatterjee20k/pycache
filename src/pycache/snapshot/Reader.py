@@ -12,6 +12,7 @@ from .Identifier import (
     Encoder,
     LengthSizeMarkers,
 )
+from datetime import datetime
 
 
 class Reader:
@@ -22,7 +23,11 @@ class Reader:
     def load(self):
         keys = self._read_length()
         for _ in range(keys):
-            key, value = self._read_key_value(expect_key=True)
+            kv = self._read_key_value(expect_key=True)
+            # End of file
+            if not kv:
+                return self.data
+            key, value = kv
             self.data[key] = value
         return self.data
 
@@ -101,7 +106,13 @@ class Reader:
                     sequences.append(entry)
                 value = value_datatype(sequences)
         else:
-            value = value_datatype(self._read_value())
+            raw_value = self._read_value()
+            # Handle datetime conversion if the datatype is DATETIME
+            if value_datatype == datetime:
+                # iso string -> datetime
+                value = datetime.fromisoformat(raw_value)
+            else:
+                value = value_datatype(raw_value)
 
         # keys are always string format
         return str(key), value

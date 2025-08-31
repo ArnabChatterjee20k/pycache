@@ -39,6 +39,7 @@ so we will have something like 11000000, 11000001, 11000010
 
 from enum import Enum
 from collections import deque
+from datetime import datetime
 
 
 class DataTypesIdentifier(Enum):
@@ -49,6 +50,8 @@ class DataTypesIdentifier(Enum):
     FLOAT = 5
     SET = 6
     DEQUE = 7
+    DATETIME = 8
+    NONE = 9
 
 
 TYPE_TO_DataTypeIdentifer = {
@@ -59,6 +62,8 @@ TYPE_TO_DataTypeIdentifer = {
     float: DataTypesIdentifier.FLOAT,
     set: DataTypesIdentifier.SET,
     deque: DataTypesIdentifier.DEQUE,
+    datetime: DataTypesIdentifier.DATETIME,
+    type(None): DataTypesIdentifier.NONE,
 }
 
 DataTypeIdentifer_TO_TYPE = {v: k for k, v in TYPE_TO_DataTypeIdentifer.items()}

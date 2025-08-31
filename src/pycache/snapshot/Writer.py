@@ -10,6 +10,7 @@ from .Identifier import (
     LengthSizeMarkers,
     SequenceTypes,
 )
+from datetime import datetime
 
 
 class Writer:
@@ -82,6 +83,10 @@ class Writer:
         self.buffer.write(bytes([byte]))
 
     def _write_value(self, value) -> int:
+        # datetime -> iso string
+        if isinstance(value, datetime):
+            value = value.isoformat()
+        
         # both numeric and strings will be handling
         # compression and integer encoding
         value = str(value)
