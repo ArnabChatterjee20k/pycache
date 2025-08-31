@@ -52,6 +52,7 @@ class DataTypesIdentifier(Enum):
     DEQUE = 7
     DATETIME = 8
     NONE = 9
+    BOOL = 10
 
 
 TYPE_TO_DataTypeIdentifer = {
@@ -64,6 +65,7 @@ TYPE_TO_DataTypeIdentifer = {
     deque: DataTypesIdentifier.DEQUE,
     datetime: DataTypesIdentifier.DATETIME,
     type(None): DataTypesIdentifier.NONE,
+    bool: DataTypesIdentifier.BOOL,
 }
 
 DataTypeIdentifer_TO_TYPE = {v: k for k, v in TYPE_TO_DataTypeIdentifer.items()}

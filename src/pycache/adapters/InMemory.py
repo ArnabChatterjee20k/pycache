@@ -3,7 +3,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 from .Adapter import Adapter
 from ..datatypes.Datatype import Datatype
-from ..snapshot.Snapshot import SnapshotManager
+from ..snapshot.Snapshot import SnapshotManager, SnapshotConfig
 
 
 class InMemory(Adapter):
@@ -12,15 +12,28 @@ class InMemory(Adapter):
     _global_lock = threading.Lock()
     _debug_mode = False
 
-    def __init__(self, connection_uri="", *args):
+    def __init__(
+        self,
+        connection_uri="",
+        snapshot=False,
+        snapshot_config: Optional[SnapshotConfig] = None,
+        *args,
+    ):
         super().__init__(connection_uri=connection_uri, *args)
         self._connected = False
-        self.snapshot = SnapshotManager()
+        self._snapshot = None
+        if snapshot:
+            self._snapshot = (
+                SnapshotManager(snapshot_config)
+                if snapshot_config
+                else SnapshotManager()
+            )
 
     async def connect(self) -> "InMemory":
         self._connected = True
-        self._shared_db = self.snapshot.load_snapshot()
-        self.snapshot.start(self._shared_db)
+        if self._snapshot and self._snapshot.is_enabled():
+            self._shared_db = self._snapshot.load_snapshot()
+            self._snapshot.start(self._shared_db)
         return self
 
     async def __aenter__(self):
@@ -30,45 +43,74 @@ class InMemory(Adapter):
         await self.close()
 
     async def close(self):
-        # Check if snapshot process is currently running
-        if self.snapshot.is_processing():
-            # Wait for snapshot process to complete or timeout after a reasonable time
-            import time
+        if self._snapshot:
+            if self._snapshot.is_processing():
+                import time
 
-            max_wait_time = 5  # Reduced wait time to avoid hanging
-            wait_interval = 0.1  # Check every 100ms
+                max_wait_time = 5
+                wait_interval = 0.1
 
-            start_time = time.time()
-            while (
-                self.snapshot.is_processing()
-                and (time.time() - start_time) < max_wait_time
-            ):
-                time.sleep(wait_interval)
+                start_time = time.time()
+                while (
+                    self._snapshot.is_processing()
+                    and (time.time() - start_time) < max_wait_time
+                ):
+                    time.sleep(wait_interval)
 
-            # If worker is still alive after timeout, force terminate
-            if self.snapshot.is_processing():
-                print("Warning: Snapshot process taking too long, forcing termination")
-                try:
-                    # Stop the worker gracefully first
-                    self.snapshot._worker.terminate()
-                    self.snapshot._worker.join(timeout=1)
+                if self._snapshot.is_processing():
+                    print(
+                        "Warning: Snapshot process taking too long, forcing termination"
+                    )
+                    try:
+                        # Stop gracefully
+                        self._snapshot._worker.terminate()
+                        self._snapshot._worker.join(timeout=1)
 
-                    # If still alive, force kill
-                    if self.snapshot._worker.is_alive():
-                        print("Force killing snapshot worker...")
-                        self.snapshot._worker.kill()
-                        self.snapshot._worker.join(timeout=1)
+                        # force kill
+                        if self._snapshot._worker.is_alive():
+                            print("Force killing snapshot worker...")
+                            self._snapshot._worker.kill()
+                            self._snapshot._worker.join(timeout=1)
 
-                except Exception as e:
-                    print(f"Error terminating snapshot worker: {e}")
+                    except Exception as e:
+                        print(f"Error terminating snapshot worker: {e}")
 
-        # Always try to stop the snapshot manager
-        try:
-            self.snapshot.stop()
-        except Exception as e:
-            print(f"Error stopping snapshot manager: {e}")
+            try:
+                self._snapshot.stop()
+            except Exception as e:
+                print(f"Error stopping snapshot manager: {e}")
 
         self._connected = False
+
+    def enable_snapshots(self, snapshot_config: Optional[SnapshotConfig] = None):
+        if self._snapshot:
+            try:
+                self._snapshot.stop()
+            except Exception:
+                pass
+
+        if snapshot_config is None:
+            snapshot_config = SnapshotConfig(auto=True, auto_multiprocessing=True)
+
+        self._snapshot = SnapshotManager(snapshot_config)
+
+        # If already connected, start the snapshot manager
+        if self._connected:
+            self._shared_db = self._snapshot.load_snapshot()
+            self._snapshot.start(self._shared_db)
+
+    def disable_snapshots(self):
+        if self._snapshot:
+            try:
+                self._snapshot.stop()
+            except Exception:
+                pass
+            self._snapshot = None
+
+    @property
+    def snapshots_enabled(self) -> bool:
+        """Check if snapshots are currently enabled"""
+        return self._snapshot is not None and self._snapshot.is_enabled()
 
     def _check_connected(self):
         if not self._connected:
@@ -118,7 +160,8 @@ class InMemory(Adapter):
                     "expires_at": None,
                     "ttl": None,
                 }
-            self.snapshot.record_change(1)
+            if self._snapshot:
+                self._snapshot.record_change(1)
             return 1
 
     async def batch_get(self, keys: list[str], datatype: Datatype = None) -> dict:
@@ -169,7 +212,8 @@ class InMemory(Adapter):
         finally:
             for lock in reversed(locks):
                 lock.release()
-        self.snapshot.record_change(count)
+        if self._snapshot:
+            self._snapshot.record_change(count)
         return count
 
     async def delete(self, key: str) -> int:
@@ -178,7 +222,8 @@ class InMemory(Adapter):
         with lock:
             if key in self._shared_db:
                 del self._shared_db[key]
-                self.snapshot.record_change(1)
+                if self._snapshot:
+                    self._snapshot.record_change(1)
                 return 1
             return 0
 
@@ -212,7 +257,8 @@ class InMemory(Adapter):
                 now = datetime.now(timezone.utc)
                 entry["expires_at"] = now + timedelta(seconds=ttl)
                 entry["ttl"] = ttl
-                self.snapshot.record_change(1)
+                if self._snapshot:
+                    self._snapshot.record_change(1)
                 return 1
             return 0
 

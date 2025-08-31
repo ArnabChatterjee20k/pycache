@@ -88,10 +88,16 @@ class Writer:
         if isinstance(value, datetime):
             value = value.isoformat()
 
+        # boolean -> integer
+        if isinstance(value, bool):
+            value = 1 if value else 0
+
         # both numeric and strings will be handling
         # compression and integer encoding
         value = str(value)
-        original_length = len(value)
+
+        # taking the length of bytes for unicode cases
+        original_length = len(value.encode("utf-8"))
         # 1byte encoding + rest for the bytes
         if (
             original_length <= 11

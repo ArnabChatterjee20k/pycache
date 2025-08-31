@@ -1,5 +1,4 @@
 import struct
-import os
 from pathlib import Path
 from io import BytesIO
 from typing import BinaryIO
@@ -99,7 +98,11 @@ class Reader:
             if TYPE_TO_DataTypeIdentifer[value_datatype] == DataTypesIdentifier.MAP:
                 current_map = {}
                 for _ in range(size):
-                    k, v = self._read_key_value(expect_key=True)
+                    kv = self._read_key_value(expect_key=True)
+                    # EOF encountered
+                    if kv is None:
+                        break
+                    k, v = kv
                     current_map[k] = v
                 value = current_map
             else:
@@ -110,15 +113,22 @@ class Reader:
                     # entry_type = DataTypeIdentifer_TO_TYPE[
                     #     DataTypesIdentifier(entry_type_byte)
                     # ]
-                    _, entry = self._read_key_value(expect_key=False)
+                    kv = self._read_key_value(expect_key=False)
+                    # EOF encountered
+                    if kv is None:
+                        break
+                    _, entry = kv
                     sequences.append(entry)
                 value = value_datatype(sequences)
         else:
             raw_value = self._read_value()
-            # Handle datetime conversion if the datatype is DATETIME
-            if value_datatype == datetime:
+            if DataTypesIdentifier(object_type) == DataTypesIdentifier.DATETIME:
                 # iso string -> datetime
                 value = datetime.fromisoformat(raw_value)
+
+            elif DataTypesIdentifier(object_type) == DataTypesIdentifier.BOOL:
+                int_val = int(raw_value)
+                value = bool(int_val)
             else:
                 if (
                     TYPE_TO_DataTypeIdentifer[value_datatype]
