@@ -1,33 +1,23 @@
 import math
 import xxhash
-from ..bitarray.BitArray import BitArray
-from .BloomFilter import (
-    BloomFilter,
-    _double_hash,
-    _get_size,
-    _get_number_of_hash_functions,
-)
+from .BloomFilter import BloomFilter, _double_hash
 
 
 class RationalBloomFilter(BloomFilter):
     _MAGIC_RANDOM_SEED_ACTIVATION = 99991
 
     def __init__(self, number_of_elements: int, false_positive_rate: float):
-        self._size = _get_size(number_of_elements, false_positive_rate)
-        self._number_of_hash_functions = _get_number_of_hash_functions(
-            self._size, number_of_elements
-        )
+        super().__init__(number_of_elements, false_positive_rate)
         self.floor_k = math.floor(self._number_of_hash_functions)
         self._activation_proabability = self._number_of_hash_functions - math.floor(
             self._number_of_hash_functions
         )
-        self._unique_elements_inserted = 0
-        self._bit_array = BitArray(self._size)
 
     def __len__(self):
         return self._unique_elements_inserted
 
     def add(self, key) -> bool:
+        # not using super add as here floor_k is used
         new_bits_toggled = False
         for i in range(self.floor_k):
             index = _double_hash(self.size, key, i)
@@ -65,8 +55,8 @@ class RationalBloomFilter(BloomFilter):
         return self._size
 
     @property
-    def value(self):
-        return self._bit_array
+    def active(self) -> "BloomFilter":
+        return self
 
     def _is_activation_required(self, key: str) -> bool:
         # deterministic hash per key

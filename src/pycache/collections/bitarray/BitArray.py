@@ -55,3 +55,9 @@ class BitArray:
     @property
     def value(self):
         return self._array
+
+    @value.setter
+    def value(self, new_value: bytearray):
+        if isinstance(new_value, bytearray):
+            raise ValueError("Cannot set value other than bytearray")
+        self._array = new_value
