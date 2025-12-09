@@ -18,21 +18,34 @@ class RationalBloomFilter(BloomFilter):
             self._size, number_of_elements
         )
         self.floor_k = math.floor(self._number_of_hash_functions)
-        self._activation_proability = self._number_of_hash_functions - math.floor(
+        self._activation_proabability = self._number_of_hash_functions - math.floor(
             self._number_of_hash_functions
         )
-
+        self._unique_elements_inserted = 0
         self._bit_array = BitArray(self._size)
 
-    def add(self, key):
+    def __len__(self):
+        return self._unique_elements_inserted
+
+    def add(self, key) -> bool:
+        new_bits_toggled = False
         for i in range(self.floor_k):
             index = _double_hash(self.size, key, i)
+            if not self._bit_array[index]:
+                new_bits_toggled = True
             self._bit_array[index] = 1
 
         if self._is_activation_required(key):
             # not using i+1 and using self.floor_k as if i is 0 then i+1 wont get 1
             index = _double_hash(self.size, key, self.floor_k)
+            if not self._bit_array[index]:
+                new_bits_toggled = True
             self._bit_array[index] = 1
+
+        if new_bits_toggled:
+            self._unique_elements_inserted += 1
+
+        return new_bits_toggled
 
     def exists(self, key) -> bool:
         for i in range(self.floor_k):
@@ -63,4 +76,4 @@ class RationalBloomFilter(BloomFilter):
         # making it in range [0,1)
         max_range_of_hash = 2**64 - 1
         hashed_value = hash_int / max_range_of_hash
-        return hashed_value < self._activation_proability
+        return hashed_value < self._activation_proabability

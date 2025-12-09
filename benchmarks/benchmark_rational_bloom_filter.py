@@ -132,7 +132,7 @@ class Benchmark:
                     "number_of_elements": n,
                     "hash_functions": filter_obj._number_of_hash_functions,
                     "floor_k": filter_obj.floor_k,
-                    "activation_probability": filter_obj._activation_proability,
+                    "activation_probability": filter_obj._activation_proabability,
                 },
             }
 

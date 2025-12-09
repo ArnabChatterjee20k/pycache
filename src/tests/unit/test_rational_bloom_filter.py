@@ -16,7 +16,7 @@ class TestRationalBloomFilter:
         assert bf._size > 0
         assert bf._number_of_hash_functions > 0
         assert bf.floor_k >= 0
-        assert 0 <= bf._activation_proability < 1
+        assert 0 <= bf._activation_proabability < 1
 
     def test_init_size_calculation(self):
         """Test that size is calculated correctly"""
@@ -38,7 +38,7 @@ class TestRationalBloomFilter:
     def test_activation_probability_range(self):
         """Test that activation probability is in [0, 1)"""
         bf = RationalBloomFilter(number_of_elements=100, false_positive_rate=0.01)
-        assert 0 <= bf._activation_proability < 1
+        assert 0 <= bf._activation_proabability < 1
 
     def test_activation_probability_calculation(self):
         """Test that activation probability is calculated correctly"""
@@ -46,7 +46,7 @@ class TestRationalBloomFilter:
         expected = bf._number_of_hash_functions - math.floor(
             bf._number_of_hash_functions
         )
-        assert abs(bf._activation_proability - expected) < 1e-10
+        assert abs(bf._activation_proabability - expected) < 1e-10
 
     def test_add_key(self):
         """Test adding a key to the filter"""

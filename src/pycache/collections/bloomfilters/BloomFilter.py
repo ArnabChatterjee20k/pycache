@@ -28,11 +28,16 @@ def _get_number_of_hash_functions(size: int, number_of_elements: int):
 
 class BloomFilter(ABC):
     @abstractmethod
-    def exists(self, key: str):
+    def exists(self, key: str) -> bool:
         pass
 
     @abstractmethod
-    def add(self, key: str):
+    def add(self, key: str) -> bool:
+        pass
+
+    # get the number of unique elements inserted
+    @abstractmethod
+    def __len__(self) -> int:
         pass
 
     @property
