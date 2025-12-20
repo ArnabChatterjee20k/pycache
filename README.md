@@ -10,7 +10,7 @@ A powerful Python caching library with TTL support, multiple backend storage opt
 - **Batch Operations**: Efficient bulk get/set operations
 - **Thread-Safe**: Designed for concurrent access
 - **Single level Transaction Support**: ACID transactions for data consistency
-- **Multiple Data Types**: Support for String, List, Map, Numeric, Set, and Queue data types
+- **Multiple Data Types**: Support for String, List, Map, Numeric, Set, Queue, BloomFilter, and BitArray data types
 - **Sharding for Mysql backend**: soon
 - **Transactions across multiple store**: soon. Having something like change_tablename or change_store to change the table name and having transaction support across multiple tables in sql
 - **Utils**: Common backend-specific decorators like rate limiter, cache functions,etc(great place to contribute)
@@ -27,7 +27,7 @@ A powerful Python caching library with TTL support, multiple backend storage opt
 import asyncio
 from src.pycache.py_cache import PyCache
 from src.pycache.adapters import InMemory, SQLite
-from src.pycache.datatypes import String, List, Map, Numeric, Set, Queue, Streams
+from src.pycache.datatypes import String, List, Map, Numeric, Set, Queue, Streams, BloomFilter, BitArray
 
 async def main():
     # Create cache with in-memory backend
@@ -86,7 +86,9 @@ asyncio.run(main())
 
 ## Data Types
 
-PyCache supports multiple data types through wrapper classes:
+PyCache supports multiple data types through wrapper classes. Most datatypes work across all adapters, but some are adapter-specific:
+- **BloomFilter** and **BitArray**: InMemory adapter only
+- **Streams**: Redis adapter only
 
 ### String
 ```python
@@ -136,6 +138,71 @@ from collections import deque
 
 await session.set("task_queue", Queue(deque(["task1", "task2", "task3"])))
 value = await session.get("task_queue")  # Returns deque(["task1", "task2", "task3"])
+```
+
+### BloomFilter (InMemory Only)
+```python
+from src.pycache.datatypes import BloomFilter
+from src.pycache.collections.bloomfilters import BloomFilter as BF
+
+# Create a BloomFilter with 1000 elements capacity and 1% false positive rate
+bf = BF(1000, 0.01)
+bf.add("user:123")
+bf.add("user:456")
+
+await session.set("user_bloom", BloomFilter(bf))
+retrieved_bf = await session.get("user_bloom")
+
+# Check if items exist
+exists = retrieved_bf.exists("user:123")  # True
+not_exists = retrieved_bf.exists("user:999")  # False (or True with small probability)
+```
+
+### ScalableBloomFilter (InMemory Only)
+```python
+from src.pycache.datatypes import BloomFilter
+from src.pycache.collections.bloomfilters import ScalableBloomFilter as SBF
+
+# Create a ScalableBloomFilter that automatically grows as needed
+# Starts with 100 elements capacity and 1% false positive rate
+sbf = SBF(100, 0.01)
+sbf.add("item:1")
+sbf.add("item:2")
+
+# ScalableBloomFilter automatically creates new filters when capacity is reached
+# Each new filter has 2x capacity and 0.5x false positive rate (configurable)
+for i in range(200):
+    sbf.add(f"item:{i}")
+
+await session.set("scalable_bloom", BloomFilter(sbf))
+retrieved_sbf = await session.get("scalable_bloom")
+
+# Check items across all filter chains
+exists = retrieved_sbf.exists("item:1")  # True
+exists_later = retrieved_sbf.exists("item:150")  # True
+
+# Get number of filter chains created
+chain_count = retrieved_sbf.chains  # Number of bloom filters in the chain
+```
+
+### BitArray (InMemory Only)
+```python
+from src.pycache.datatypes import BitArray
+from src.pycache.collections.bitarray.BitArray import BitArray as BA
+
+# Create a BitArray with 64 bits
+ba = BA(64)
+ba[0] = 1
+ba[10] = 1
+ba[63] = 1
+
+await session.set("flags", BitArray(ba))
+retrieved_ba = await session.get("flags")
+
+# Access and modify bits
+bit_value = retrieved_ba[0]  # 1
+retrieved_ba[20] = 1
+retrieved_ba.toggle_bit(10)  # Toggle bit at index 10
 ```
 
 ## TTL (Time-To-Live) Support
@@ -461,6 +528,8 @@ asyncio.run(main())
 - `Set(value)`: Store set values
 - `Queue(value)`: Store deque values
 - `Streams(value)`: Store stream data (Redis streams support)
+- `BloomFilter(value)`: Store BloomFilter instances (InMemory adapter only)
+- `BitArray(value)`: Store BitArray instances (InMemory adapter only)
 
 ## Knowledge Dump
 

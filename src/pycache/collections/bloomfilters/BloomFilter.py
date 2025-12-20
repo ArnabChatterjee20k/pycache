@@ -1,7 +1,7 @@
 import xxhash
 import math
 from ..bitarray.BitArray import BitArray
-from .storage import MAX_CHUNK_SIZE, Chain, Header
+from .storage import Chain, Header
 
 # large primes
 _MAGIC_RANDOM_SEED_1 = 0x9E3779B97F4A7C15
@@ -58,7 +58,7 @@ class BloomFilter:
             self._unique_elements_inserted += 1
 
         return new_bits_toggled
-    
+
     def dump_header(self) -> Header:
         pass
 

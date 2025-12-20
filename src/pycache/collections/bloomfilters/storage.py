@@ -32,72 +32,80 @@ Loading
 Header creates skeleton filters and Chain fill those skeleton
 """
 
+
 @dataclass
 class Header:
-    chains:int
-    unique_elements:int
-    growth:int
-    tightening:int
+    chains: int
+    unique_elements: int
+    growth: int
+    tightening: int
 
-    filters:list['Chain']
+    filters: list["Chain"]
 
-    packing_format:ClassVar['str'] = '<QIII'
-    size:ClassVar[int] = 20 #bytes(8+4*3)
+    packing_format: ClassVar["str"] = "<QIII"
+    size: ClassVar[int] = 20  # bytes(8+4*3)
 
     @classmethod
     def pack(cls, chains, unique_elements, growth, tightening) -> bytes:
         """
-            uint64_t unique_elements;     // Total unique elements across all chains
-            uint32_t growth;              // Growth multiplier
-            uint32_t tightening;          // Error tightening factor
-            uint32_t chains;              // Number of chains/filters
+        uint64_t unique_elements;     // Total unique elements across all chains
+        uint32_t growth;              // Growth multiplier
+        uint32_t tightening;          // Error tightening factor
+        uint32_t chains;              // Number of chains/filters
         """
-        return struct.pack(cls.packing_format,chains, unique_elements, growth, tightening)
-    
+        return struct.pack(
+            cls.packing_format, chains, unique_elements, growth, tightening
+        )
+
     @classmethod
-    def unpack(cls,raw_bytes:bytes) -> 'Header':
+    def unpack(cls, raw_bytes: bytes) -> "Header":
         """
-            Raw bytes include header + chains metadata
+        Raw bytes include header + chains metadata
         """
         if len(raw_bytes) < cls.size:
-            raise ValueError(f"Data too small: expected at least {cls.STRUCT_SIZE} bytes")
+            raise ValueError(
+                f"Data too small: expected at least {cls.STRUCT_SIZE} bytes"
+            )
 
-        unique_elements, growth, tightening, chains = struct.unpack(cls.packing_format,raw_bytes)
+        unique_elements, growth, tightening, chains = struct.unpack(
+            cls.packing_format, raw_bytes
+        )
         filters = []
-        
-        filters_metadata = raw_bytes[cls.size:]
+
+        filters_metadata = raw_bytes[cls.size :]
         # for _ in range(chains):
 
-        
         for i in range(chains):
             filters.append(Chain())
 
         return Header(unique_elements, growth, tightening, chains, filters)
 
+
 @dataclass
 class Chain:
-    false_positive_rate:float
-    number_of_elements:int
+    false_positive_rate: float
+    number_of_elements: int
     # taking hash_functions as double as RationalBloomfilter uses rational hash_functions
-    hash_functions:float
-    unique_elements:int
+    hash_functions: float
+    unique_elements: int
 
-    packing_format:ClassVar['str'] = '<dQdQ'
-    size:ClassVar[int] = 32 #bytes(8*4)
+    packing_format: ClassVar["str"] = "<dQdQ"
+    size: ClassVar[int] = 32  # bytes(8*4)
 
     @classmethod
     def pack(cls) -> bytes:
         """
-            double false_positive_rate
-            uint64 number_of_elements
-            double hash_functions
-            uint64 unique_elements
+        double false_positive_rate
+        uint64 number_of_elements
+        double hash_functions
+        uint64 unique_elements
         """
         pass
-    
+
     @classmethod
-    def unpack() -> 'Chunk':
+    def unpack() -> "Chunk":
         pass
+
 
 @dataclass
 class Chunk:
@@ -107,7 +115,7 @@ class Chunk:
     @classmethod
     def pack(cls) -> bytes:
         pass
-    
+
     @classmethod
-    def unpack() -> 'Chunk':
+    def unpack() -> "Chunk":
         pass

@@ -84,6 +84,18 @@ This document provides a comprehensive comparison of PyCache adapters, their sup
 | Datatype | InMemory | SQLite | Redis | Implementation |
 |----------|----------|---------|-------|----------------|
 | `Streams` | ❌ | ❌ | ✅ | Redis-specific streams |
+| `BloomFilter` | ✅ | ❌ | ❌ | Probabilistic data structure for membership testing |
+| `BitArray` | ✅ | ❌ | ❌ | Efficient bit-level array operations |
+
+#### BloomFilter Variants
+
+The InMemory adapter supports multiple BloomFilter implementations through the `BloomFilter` datatype:
+
+- **BloomFilter**: Standard fixed-size bloom filter with configurable capacity and false positive rate. Best for known dataset sizes.
+- **ScalableBloomFilter**: Automatically grows by chaining multiple bloom filters. Each new filter has increased capacity (default 2x) and reduced false positive rate (default 0.5x). Ideal for datasets with unknown or growing sizes.
+- **RationalBloomFilter**: Uses rational hash functions for more precise false positive rate control. Provides better accuracy for the target false positive rate compared to standard bloom filters.
+
+All variants can be used with the `BloomFilter` datatype wrapper and support the same interface (`add()`, `exists()`, `len()`).
 
 ## Implementation Details
 
@@ -94,6 +106,7 @@ This document provides a comprehensive comparison of PyCache adapters, their sup
 - **Transactions**: Not implemented (single-threaded operations)
 - **Performance**: Fastest for small datasets, memory-limited
 - **Snapshot Support**: Custom snapshot system with configurable triggers and file-based persistence
+- **Special Datatypes**: Supports BloomFilter and BitArray for probabilistic data structures and bit-level operations
 
 ### SQLite Adapter
 - **Storage**: SQLite database with custom schema

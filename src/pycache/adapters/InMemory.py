@@ -4,6 +4,8 @@ from typing import Dict, Any, Optional
 from .Adapter import Adapter
 from ..datatypes.Datatype import Datatype
 from ..snapshot.Snapshot import SnapshotManager, SnapshotConfig
+from ..collections.bloomfilters import BloomFilter as BloomFilterImpl
+from ..collections.bitarray.BitArray import BitArray as BitArrayImpl
 
 
 class InMemory(Adapter):
@@ -140,7 +142,7 @@ class InMemory(Adapter):
                 return self.to_value(entry["value"])
             return None
 
-    async def set(self, key: str, value: bytes) -> int:
+    async def set(self, key: str, value: Any) -> int:
         self._check_connected()
         lock = self._get_lock(key)
         with lock:
@@ -162,6 +164,7 @@ class InMemory(Adapter):
                 }
             if self._snapshot:
                 self._snapshot.record_change(1)
+            print(self._shared_db)
             return 1
 
     async def batch_get(self, keys: list[str], datatype: Datatype = None) -> dict:

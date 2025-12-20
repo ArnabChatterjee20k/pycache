@@ -6,5 +6,18 @@ from .Queue import Queue
 from .Set import Set
 from .String import String
 from .Streams import Streams
+from .BloomFilter import BloomFilter
+from .BitArray import BitArray
 
-__all__ = ["Datatype", "List", "Map", "Numeric", "Queue", "Set", "String", "Streams"]
+__all__ = [
+    "Datatype",
+    "List",
+    "Map",
+    "Numeric",
+    "Queue",
+    "Set",
+    "String",
+    "Streams",
+    "BloomFilter",
+    "BitArray",
+]
