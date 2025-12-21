@@ -163,26 +163,29 @@ not_exists = retrieved_bf.exists("user:999")  # False (or True with small probab
 from src.pycache.datatypes import BloomFilter
 from src.pycache.collections.bloomfilters import ScalableBloomFilter as SBF
 
-# Create a ScalableBloomFilter that automatically grows as needed
-# Starts with 100 elements capacity and 1% false positive rate
-sbf = SBF(100, 0.01)
-sbf.add("item:1")
-sbf.add("item:2")
+# Practical example: Track unique user visits
+# Start with 100 users capacity, automatically grows if needed
+user_tracker = SBF(100, 0.01)  # 1% false positive rate
 
-# ScalableBloomFilter automatically creates new filters when capacity is reached
+# Add unique user IDs
+user_tracker.add("user:12345")
+user_tracker.add("user:67890")
+
+# Check if user exists (prevents duplicate processing)
+if not user_tracker.exists("user:99999"):
+    user_tracker.add("user:99999")
+    print("Processing new user")
+
+# Store in cache
+await session.set("unique_users", BloomFilter(user_tracker))
+
+# Retrieve and continue using
+retrieved = await session.get("unique_users")
+print(f"Total unique users: {len(retrieved)}")
+print(f"Filter chains: {retrieved.chains}")  # Shows auto-growth
+
+# ScalableBloomFilter automatically creates new filter chains when capacity is reached
 # Each new filter has 2x capacity and 0.5x false positive rate (configurable)
-for i in range(200):
-    sbf.add(f"item:{i}")
-
-await session.set("scalable_bloom", BloomFilter(sbf))
-retrieved_sbf = await session.get("scalable_bloom")
-
-# Check items across all filter chains
-exists = retrieved_sbf.exists("item:1")  # True
-exists_later = retrieved_sbf.exists("item:150")  # True
-
-# Get number of filter chains created
-chain_count = retrieved_sbf.chains  # Number of bloom filters in the chain
 ```
 
 ### BitArray (InMemory Only)
